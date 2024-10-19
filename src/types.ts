@@ -3,10 +3,11 @@ export interface User {
   name: string;
   selectedPlan: string;
   letterCount: number;
-  personalData?: any;
+  studies: string;
+  experiences: string[];
 }
 
-export interface CoverLetter {
+export interface CoverLetterData {
   userId: string;
   jobAd: string;
   coverLetter: string;
