@@ -1,13 +1,14 @@
 export interface User {
+  username: string;
   email: string;
-  name: string;
-  selectedPlan: string;
-  letterCount: number;
+  password: string; // Note: In a real production environment, never store plain text passwords
   studies: string;
   experiences: string[];
+  selectedPlan: string;
+  letterCount: number;
 }
 
-export interface CoverLetterData {
+export interface CoverLetter {
   userId: string;
   jobAd: string;
   coverLetter: string;

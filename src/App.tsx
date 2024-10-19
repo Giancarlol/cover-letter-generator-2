@@ -6,7 +6,7 @@ import RegistrationForm from './components/RegistrationForm';
 import PersonalDataPopup from './components/PersonalDataPopup';
 import PaymentPlanSelection from './components/PaymentPlanSelection';
 import { generateCoverLetter } from './utils/coverLetterGenerator';
-import mockMongoDB from './utils/mongodb';
+import mongodb from './utils/mongodb';
 
 function App() {
   const [isRegistered, setIsRegistered] = useState(false);
@@ -19,16 +19,21 @@ function App() {
   const [isPaymentPlanPopupOpen, setIsPaymentPlanPopupOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [letterCount, setLetterCount] = useState(0);
+  const [apiKeyMissing, setApiKeyMissing] = useState(false);
 
   useEffect(() => {
     if (!import.meta.env.VITE_OPENAI_API_KEY) {
-      setError("OpenAI API key is not set. Please set the VITE_OPENAI_API_KEY environment variable.");
+      setApiKeyMissing(true);
     }
+    mongodb.connect().catch(console.error);
+    return () => {
+      mongodb.close().catch(console.error);
+    };
   }, []);
 
   const handleRegistration = async (userData) => {
     try {
-      const result = await mockMongoDB.insertUser({
+      const result = await mongodb.insertUser({
         ...userData,
         selectedPlan: 'Free Plan',
         letterCount: 0
@@ -46,7 +51,7 @@ function App() {
 
   const handlePlanSelection = async (plan: string) => {
     try {
-      await mockMongoDB.updateUser(personalData.email, { selectedPlan: plan });
+      await mongodb.updateUser(personalData.email, { selectedPlan: plan });
       console.log('Selected plan:', plan);
       setSelectedPlan(plan);
       setIsPaymentPlanPopupOpen(false);
@@ -58,7 +63,7 @@ function App() {
 
   const handlePersonalDataSubmit = async (data) => {
     try {
-      await mockMongoDB.updateUser(data.email, { personalData: data });
+      await mongodb.updateUser(personalData.email, data);
       setPersonalData(data);
       setIsPersonalDataPopupOpen(false);
     } catch (error) {
@@ -88,13 +93,13 @@ function App() {
         setCoverLetter(letter);
         const newLetterCount = letterCount + 1;
         setLetterCount(newLetterCount);
-        await mockMongoDB.insertCoverLetter({
+        await mongodb.insertCoverLetter({
           userId: personalData.email,
           jobAd,
           coverLetter: letter,
           createdAt: new Date()
         });
-        await mockMongoDB.updateUser(personalData.email, { letterCount: newLetterCount });
+        await mongodb.updateUser(personalData.email, { letterCount: newLetterCount });
       }
     } catch (error) {
       console.error('Error generating cover letter:', error);
@@ -110,6 +115,12 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12 relative">
+      {apiKeyMissing && (
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <strong className="font-bold">Warning: </strong>
+          <span className="block sm:inline">OpenAI API key is missing. Some features may not work correctly.</span>
+        </div>
+      )}
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
           <strong className="font-bold">Error: </strong>

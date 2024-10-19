@@ -13,6 +13,7 @@
     "@stripe/react-stripe-js": "^2.8.1",
     "@stripe/stripe-js": "^1.54.0",
     "lucide-react": "^0.344.0",
+    "mongodb": "^6.9.0",
     "openai": "^4.67.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

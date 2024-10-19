@@ -1,66 +1,56 @@
+import { MongoClient, Db } from 'mongodb';
 import { User, CoverLetter } from '../types';
 
-class MockMongoDB {
-  private users: User[] = [];
-  private coverLetters: CoverLetter[] = [];
+class MongoDB {
+  private client: MongoClient;
+  private db: Db;
 
-  async insertUser(userData: User): Promise<{ insertedId: string }> {
-    this.users.push(userData);
-    return { insertedId: userData.email };
+  constructor() {
+    const uri = import.meta.env.VITE_MONGODB_URI;
+    if (!uri) {
+      throw new Error('MongoDB URI is not set. Please set the VITE_MONGODB_URI environment variable.');
+    }
+    this.client = new MongoClient(uri);
   }
 
-  async updateUser(email: string, update: Partial<User>): Promise<void> {
-    const userIndex = this.users.findIndex(user => user.email === email);
-    if (userIndex !== -1) {
-      this.users[userIndex] = { ...this.users[userIndex], ...update };
+  async connect() {
+    try {
+      await this.client.connect();
+      this.db = this.client.db('coverLetterGenerator');
+      console.log('Connected to MongoDB');
+    } catch (error) {
+      console.error('Failed to connect to MongoDB', error);
+      throw error;
     }
   }
 
-  async insertCoverLetter(coverLetterData: CoverLetter): Promise<void> {
-    this.coverLetters.push(coverLetterData);
-  }
-
-  async getUser(email: string): Promise<User | null> {
-    return this.users.find(user => user.email === email) || null;
-  }
-}
-
-class RealMongoDB {
   async insertUser(userData: User): Promise<{ insertedId: string }> {
-    const response = await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData),
-    });
-    return response.json();
+    const collection = this.db.collection('users');
+    const result = await collection.insertOne(userData);
+    return { insertedId: result.insertedId.toString() };
   }
 
   async updateUser(email: string, update: Partial<User>): Promise<void> {
-    await fetch(`/api/users/${email}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(update),
-    });
+    const collection = this.db.collection('users');
+    await collection.updateOne({ email }, { $set: update });
   }
 
   async insertCoverLetter(coverLetterData: CoverLetter): Promise<void> {
-    await fetch('/api/cover-letters', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(coverLetterData),
-    });
+    const collection = this.db.collection('coverLetters');
+    await collection.insertOne(coverLetterData);
   }
 
   async getUser(email: string): Promise<User | null> {
-    const response = await fetch(`/api/users/${email}`);
-    if (response.ok) {
-      return response.json();
-    }
-    return null;
+    const collection = this.db.collection('users');
+    return collection.findOne({ email });
+  }
+
+  async close() {
+    await this.client.close();
+    console.log('Disconnected from MongoDB');
   }
 }
 
-const isProduction = import.meta.env.PROD;
-const MongoDB = isProduction ? new RealMongoDB() : new MockMongoDB();
+const mongodb = new MongoDB();
 
-export default MongoDB;
+export default mongodb;
