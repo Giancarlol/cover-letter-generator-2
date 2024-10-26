@@ -20,6 +20,11 @@ export interface LoginResponse {
   user: PersonalData;
 }
 
+export interface RegistrationResponse {
+  message: string;
+  userId: string;
+}
+
 let authToken: string | null = localStorage.getItem('authToken');
 
 const setAuthToken = (token: string) => {
@@ -44,15 +49,17 @@ const mergeHeaders = (headers: Record<string, string>): HeadersInit => {
 };
 
 const handleResponse = async (response: Response) => {
-  if (response.status === 401) {
-    clearAuthToken();
-    throw new Error('Your session has expired. Please log in again.');
-  }
+  const contentType = response.headers.get('content-type');
   if (!response.ok) {
-    const errorData = await response.json();
+    const errorData = contentType?.includes('application/json') 
+      ? await response.json()
+      : { message: 'An error occurred' };
     throw new Error(errorData.message || 'An error occurred');
   }
-  return response.json();
+  if (contentType?.includes('application/json')) {
+    return response.json();
+  }
+  return response.text();
 };
 
 export const login = async (email: string, password: string): Promise<LoginResponse> => {
@@ -70,7 +77,7 @@ export const logout = () => {
   clearAuthToken();
 };
 
-export const registerUser = async (userData: RegistrationData) => {
+export const registerUser = async (userData: RegistrationData): Promise<RegistrationResponse> => {
   const response = await fetch(`${API_BASE_URL}/api/register`, {
     method: 'POST',
     headers: mergeHeaders({}),
@@ -117,6 +124,16 @@ export const checkAuth = async (): Promise<PersonalData | null> => {
   } catch (error) {
     console.error('Error checking authentication:', error);
     clearAuthToken();
+    return null;
+  }
+};
+
+// Function to refresh user data after successful payment
+export const refreshUserData = async (): Promise<PersonalData | null> => {
+  try {
+    return await checkAuth();
+  } catch (error) {
+    console.error('Error refreshing user data:', error);
     return null;
   }
 };

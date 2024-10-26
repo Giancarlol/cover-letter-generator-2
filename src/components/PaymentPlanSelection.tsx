@@ -15,10 +15,6 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClos
     { name: 'Premium Plan', price: 899, letters: 40, features: ['40 letters per month', 'All templates', '24/7 support', 'Advanced customization'] },
   ];
 
-  const handleSuccess = (planName: string) => {
-    onSelectPlan(planName);
-  };
-
   const handleError = (error: string) => {
     console.error('Stripe error:', error);
     // You might want to show this error to the user
@@ -64,7 +60,6 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClos
                   <StripeCheckout
                     planName={plan.name}
                     planPrice={plan.price}
-                    onSuccess={handleSuccess}
                     onError={handleError}
                   />
                 )}

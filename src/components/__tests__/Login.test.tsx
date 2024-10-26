@@ -17,6 +17,11 @@ describe('Login Component', () => {
     expect(screen.getByRole('button', { name: /Login/i })).toBeInTheDocument();
   });
 
+  it('disables the login button when fields are empty', () => {
+    const loginButton = screen.getByRole('button', { name: /Login/i });
+    expect(loginButton).toBeDisabled();
+  });
+
   it('validates empty fields', async () => {
     fireEvent.click(screen.getByRole('button', { name: /Login/i }));
 
@@ -47,6 +52,29 @@ describe('Login Component', () => {
 
     await waitFor(() => {
       expect(mockOnLogin).toHaveBeenCalledWith('test@example.com', 'password123');
+    });
+  });
+
+  it('shows loading indicator during submission', async () => {
+    fireEvent.change(screen.getByLabelText(/Email address/i), { target: { value: 'test@example.com' } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByRole('button', { name: /Login/i }));
+
+    expect(screen.getByText(/loading/i)).toBeInTheDocument(); // Adjust according to your loading implementation
+  });
+
+  it('displays error message on failed login', async () => {
+    // Mock the onLogin function to simulate a failed login
+    mockOnLogin.mockImplementationOnce(() => {
+      throw new Error('Invalid credentials');
+    });
+
+    fireEvent.change(screen.getByLabelText(/Email address/i), { target: { value: 'test@example.com' } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'wrongpassword' } });
+    fireEvent.click(screen.getByRole('button', { name: /Login/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Invalid credentials')).toBeInTheDocument();
     });
   });
 });

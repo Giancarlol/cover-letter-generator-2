@@ -1,9 +1,9 @@
-import { MongoClient, Db } from 'mongodb';
+import { MongoClient, Db, WithId, Document } from 'mongodb';
 import { User, CoverLetter } from '../types';
 
 class MongoDB {
   private client: MongoClient;
-  private db: Db;
+  private db!: Db; // Using definite assignment assertion since we initialize in connect()
 
   constructor() {
     const uri = import.meta.env.VITE_MONGODB_URI;
@@ -41,13 +41,26 @@ class MongoDB {
   }
 
   async getUser(email: string): Promise<User | null> {
-    const collection = this.db.collection('users');
-    return collection.findOne({ email });
+    const collection = this.db.collection<User>('users');
+    const user = await collection.findOne({ email });
+    return user ? this.transformToUser(user) : null;
   }
 
   async close() {
     await this.client.close();
     console.log('Disconnected from MongoDB');
+  }
+
+  private transformToUser(doc: WithId<Document>): User {
+    return {
+      username: doc.username as string,
+      email: doc.email as string,
+      password: doc.password as string,
+      studies: doc.studies as string,
+      experiences: doc.experiences as string[],
+      selectedPlan: doc.selectedPlan as string,
+      letterCount: doc.letterCount as number
+    };
   }
 }
 

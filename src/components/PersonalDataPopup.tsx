@@ -8,8 +8,10 @@ interface PersonalDataPopupProps {
 }
 
 const PersonalDataPopup: React.FC<PersonalDataPopupProps> = ({ onClose, onSubmit, initialData }) => {
-  const [studies, setStudies] = useState(initialData.studies);
-  const [experiences, setExperiences] = useState(initialData.experiences.join('\n'));
+  const [studies, setStudies] = useState(initialData.studies || '');
+  const [experiences, setExperiences] = useState(
+    Array.isArray(initialData.experiences) ? initialData.experiences.join('\n') : ''
+  );
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const validateForm = () => {

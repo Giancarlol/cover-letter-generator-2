@@ -1,26 +1,37 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 
-// Replace with your actual Stripe publishable key
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 interface StripeCheckoutProps {
   planName: string;
   planPrice: number;
-  onSuccess: (planName: string) => void;
   onError: (error: string) => void;
 }
 
-const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, onSuccess, onError }) => {
-  const handleCheckout = async () => {
-    const stripe = await stripePromise;
-    if (!stripe) {
-      onError('Failed to load Stripe');
-      return;
-    }
+const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, onError }) => {
+  useEffect(() => {
+    // Log for debugging (remove in production)
+    console.log('Component mounted with:', {
+      hasStripeKey: !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
+      planName,
+      planPrice
+    });
+  }, [planName, planPrice]);
 
+  const handleCheckout = async () => {
     try {
-      const response = await fetch('/api/create-checkout-session', {
+      const stripe = await stripePromise;
+      if (!stripe) {
+        throw new Error('Failed to initialize Stripe');
+      }
+
+      console.log('Making request to create checkout session');
+      console.log('Request payload:', { planName, planPrice });
+
+      // Use the full URL instead of relative path
+      const response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -31,17 +42,36 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
         }),
       });
 
-      const session = await response.json();
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('Error response:', text);
+        try {
+          const errorData = JSON.parse(text);
+          throw new Error(errorData.error || 'Failed to create checkout session');
+        } catch (e) {
+          throw new Error(`Server error: ${text}`);
+        }
+      }
+
+      const data = await response.json();
+      console.log('Session created:', data);
+
+      if (!data.id) {
+        throw new Error('Invalid session data received');
+      }
 
       const result = await stripe.redirectToCheckout({
-        sessionId: session.id,
+        sessionId: data.id,
       });
 
       if (result.error) {
-        onError(result.error.message);
+        throw new Error(result.error.message || 'An error occurred during checkout');
       }
     } catch (error) {
-      onError('An error occurred during checkout');
+      console.error('Stripe checkout error:', error);
+      onError(error instanceof Error ? error.message : 'An error occurred during checkout');
     }
   };
 

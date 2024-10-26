@@ -1,5 +1,11 @@
 import OpenAI from 'openai';
 
+interface PersonalData {
+  name: string;
+  studies: string;
+  experiences: string[];
+}
+
 const getOpenAIApiKey = () => {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   if (!apiKey) {
@@ -10,7 +16,7 @@ const getOpenAIApiKey = () => {
 
 const MAX_TOKENS = 900; // Adjust this value based on your needs
 
-export const generateCoverLetter = async (personalData, jobAd) => {
+export const generateCoverLetter = async (personalData: PersonalData, jobAd: string) => {
   try {
     const apiKey = getOpenAIApiKey();
     const openai = new OpenAI({
@@ -51,11 +57,14 @@ export const generateCoverLetter = async (personalData, jobAd) => {
     }
 
     return generatedContent;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error generating cover letter:', error);
-    if (error.message.includes('API key')) {
-      return "Error: OpenAI API key is not set or is invalid. Please check your environment variables and ensure the VITE_OPENAI_API_KEY is correctly set.";
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        return "Error: OpenAI API key is not set or is invalid. Please check your environment variables and ensure the VITE_OPENAI_API_KEY is correctly set.";
+      }
+      return `An error occurred while generating the cover letter. Please try again later. Error details: ${error.message}`;
     }
-    return `An error occurred while generating the cover letter. Please try again later. Error details: ${error.message}`;
+    return "An unknown error occurred while generating the cover letter. Please try again later.";
   }
 };
