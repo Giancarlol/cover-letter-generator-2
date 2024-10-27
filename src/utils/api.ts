@@ -70,7 +70,13 @@ export const login = async (email: string, password: string): Promise<LoginRespo
   });
   const data = await handleResponse(response);
   setAuthToken(data.token);
-  return data;
+  
+  // Fetch fresh user data after login
+  const userData = await getUser(email);
+  return {
+    token: data.token,
+    user: userData
+  };
 };
 
 export const logout = () => {
@@ -126,6 +132,24 @@ export const checkAuth = async (): Promise<PersonalData | null> => {
     clearAuthToken();
     return null;
   }
+};
+
+export const requestPasswordReset = async (email: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/reset-password`, {
+    method: 'POST',
+    headers: mergeHeaders({}),
+    body: JSON.stringify({ email }),
+  });
+  return handleResponse(response);
+};
+
+export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/reset-password/confirm`, {
+    method: 'POST',
+    headers: mergeHeaders({}),
+    body: JSON.stringify({ token, newPassword }),
+  });
+  return handleResponse(response);
 };
 
 // Function to refresh user data after successful payment

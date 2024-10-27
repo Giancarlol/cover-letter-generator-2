@@ -8,6 +8,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { OpenAI } = require('openai');
 const rateLimit = require('express-rate-limit');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 // Initialize Stripe with the secret key
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -21,6 +23,15 @@ console.log('Environment Check:', {
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Email transporter setup
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD
+  }
+});
 
 // CORS configuration
 app.use(cors({
@@ -77,6 +88,97 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// Password reset request endpoint
+app.post('/api/reset-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const db = client.db('coverLetterGenerator');
+    const users = db.collection('users');
+
+    const user = await users.findOne({ email });
+    if (!user) {
+      // Still return success to prevent email enumeration
+      return res.status(200).json({ message: 'If an account exists with that email, you will receive password reset instructions shortly.' });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Store the reset token and expiry
+    await users.updateOne(
+      { email },
+      {
+        $set: {
+          resetToken,
+          resetTokenExpiry
+        }
+      }
+    );
+
+    // Send reset email
+    const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Password Reset Request',
+      html: `
+        <p>You requested a password reset for your Cover Letter Generator account.</p>
+        <p>Click the link below to reset your password:</p>
+        <a href="${resetUrl}">Reset Password</a>
+        <p>This link will expire in 1 hour.</p>
+        <p>If you didn't request this reset, you can safely ignore this email.</p>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({
+      message: 'If an account exists with that email, you will receive password reset instructions shortly.'
+    });
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    res.status(500).json({ message: 'Error processing password reset request' });
+  }
+});
+
+// Password reset confirmation endpoint
+app.post('/api/reset-password/confirm', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const db = client.db('coverLetterGenerator');
+    const users = db.collection('users');
+
+    // Find user with valid reset token
+    const user = await users.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password and remove reset token
+    await users.updateOne(
+      { _id: user._id },
+      {
+        $set: { password: hashedPassword },
+        $unset: { resetToken: "", resetTokenExpiry: "" }
+      }
+    );
+
+    res.status(200).json({ message: 'Password successfully reset' });
+  } catch (error) {
+    console.error('Password reset confirmation error:', error);
+    res.status(500).json({ message: 'Error resetting password' });
+  }
+});
 
 // Stripe checkout session endpoint
 app.post('/api/create-checkout-session', async (req, res) => {

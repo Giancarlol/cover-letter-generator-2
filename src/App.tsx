@@ -6,6 +6,7 @@ import JobAdForm from './components/JobAdForm';
 import PersonalDataForm from './components/PersonalDataForm';
 import PaymentPlanSelection from './components/PaymentPlanSelection';
 import PaymentSuccess from './components/PaymentSuccess';
+import ResetPassword from './components/ResetPassword';
 import { checkAuth, clearAuthToken, registerUser } from './utils/api';
 import type { PersonalData, RegistrationData } from './utils/api';
 
@@ -142,6 +143,7 @@ function App() {
             }
           />
           <Route path="/success" element={<PaymentSuccess />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
         </Routes>
       </main>
     </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PersonalData } from '../utils/api';
+import { PersonalData, updateUser } from '../utils/api';
 import PersonalDataPopup from './PersonalDataPopup';
 
 export interface PersonalDataFormProps {
@@ -43,13 +43,25 @@ const PersonalDataForm: React.FC<PersonalDataFormProps> = ({ onSubmit }) => {
     }
   };
 
-  const handlePopupSubmit = (data: { studies: string; experiences: string[] }) => {
-    setFormData(prev => ({
-      ...prev,
-      studies: data.studies,
-      experiences: data.experiences
-    }));
-    setShowPopup(false);
+  const handlePopupSubmit = async (data: { studies: string; experiences: string[] }) => {
+    try {
+      // Update the backend
+      await updateUser(formData.email, {
+        studies: data.studies,
+        experiences: data.experiences
+      });
+
+      // Update local state
+      setFormData(prev => ({
+        ...prev,
+        studies: data.studies,
+        experiences: data.experiences
+      }));
+      setShowPopup(false);
+    } catch (error) {
+      console.error('Error updating user data:', error);
+      alert('Failed to save changes. Please try again.');
+    }
   };
 
   return (
