@@ -1,4 +1,8 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE_URL) {
+  throw new Error('VITE_API_BASE_URL environment variable is not set');
+}
 
 export interface RegistrationData {
   name: string;
@@ -63,20 +67,25 @@ const handleResponse = async (response: Response) => {
 };
 
 export const login = async (email: string, password: string): Promise<LoginResponse> => {
-  const response = await fetch(`${API_BASE_URL}/api/login`, {
-    method: 'POST',
-    headers: mergeHeaders({}),
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await handleResponse(response);
-  setAuthToken(data.token);
-  
-  // Fetch fresh user data after login
-  const userData = await getUser(email);
-  return {
-    token: data.token,
-    user: userData
-  };
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/login`, {
+      method: 'POST',
+      headers: mergeHeaders({}),
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await handleResponse(response);
+    setAuthToken(data.token);
+    
+    // Fetch fresh user data after login
+    const userData = await getUser(email);
+    return {
+      token: data.token,
+      user: userData
+    };
+  } catch (error) {
+    clearAuthToken();
+    throw error;
+  }
 };
 
 export const logout = () => {
@@ -152,7 +161,6 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   return handleResponse(response);
 };
 
-// Function to refresh user data after successful payment
 export const refreshUserData = async (): Promise<PersonalData | null> => {
   try {
     return await checkAuth();

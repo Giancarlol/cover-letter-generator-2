@@ -14,15 +14,22 @@ const crypto = require('crypto');
 // Initialize Stripe with the secret key
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-// Log environment check (remove in production)
-console.log('Environment Check:', {
-  stripeKey: !!process.env.STRIPE_SECRET_KEY,
-  port: process.env.PORT || 3001,
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:4179'
-});
-
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+
+app.use(limiter);
+
+// Additional rate limits for sensitive endpoints
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5 // limit each IP to 5 requests per windowMs
+});
 
 // Email transporter setup
 const transporter = nodemailer.createTransport({
@@ -35,7 +42,7 @@ const transporter = nodemailer.createTransport({
 
 // CORS configuration
 app.use(cors({
-  origin: ['http://localhost:4179', 'http://localhost:5173', 'http://localhost:4177'],
+  origin: process.env.CLIENT_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -44,13 +51,110 @@ app.use(cors({
 // This is your Stripe CLI webhook secret for testing your endpoint locally.
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-app.use(express.json({
-  verify: function(req, res, buf) {
-    if (req.originalUrl.startsWith('/api/webhook')) {
-      req.rawBody = buf.toString();
+// Special raw body parsing for Stripe webhooks
+app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+  } catch (err) {
+    res.status(400).send(`Webhook Error: ${err.message}`);
+    return;
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'checkout.session.completed': {
+      const session = event.data.object;
+      
+      try {
+        // Get customer email from session
+        const customer = await stripe.customers.retrieve(session.customer);
+        const customerEmail = customer.email;
+
+        // Update user in database
+        const db = client.db('coverLetterGenerator');
+        const users = db.collection('users');
+
+        // Get the payment amount to determine the plan
+        const amount = session.amount_total;
+        let selectedPlan = 'Free Plan';
+        let letterCount = 0;
+
+        // Set plan based on payment amount
+        if (amount === 999) { // $9.99
+          selectedPlan = 'Basic Plan';
+          letterCount = 5;
+        } else if (amount === 1999) { // $19.99
+          selectedPlan = 'Premium Plan';
+          letterCount = 15;
+        }
+
+        await users.updateOne(
+          { email: customerEmail },
+          { 
+            $set: { 
+              selectedPlan,
+              letterCount,
+              paymentStatus: 'completed',
+              lastPaymentDate: new Date()
+            }
+          }
+        );
+
+        // Send confirmation email
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: customerEmail,
+          subject: 'Payment Confirmation - Cover Letter Generator',
+          html: `
+            <h1>Thank you for your purchase!</h1>
+            <p>Your payment has been successfully processed.</p>
+            <p>Plan: ${selectedPlan}</p>
+            <p>Available letter generations: ${letterCount}</p>
+            <p>If you have any questions, please don't hesitate to contact us.</p>
+          `
+        };
+
+        await transporter.sendMail(mailOptions);
+      } catch (error) {
+        console.error('Error processing webhook:', error);
+      }
+      break;
+    }
+    case 'payment_intent.payment_failed': {
+      const paymentIntent = event.data.object;
+      try {
+        // Get customer email
+        const customer = await stripe.customers.retrieve(paymentIntent.customer);
+        const customerEmail = customer.email;
+
+        // Send failure notification
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: customerEmail,
+          subject: 'Payment Failed - Cover Letter Generator',
+          html: `
+            <h1>Payment Failed</h1>
+            <p>We were unable to process your payment. Please try again or contact support if the issue persists.</p>
+          `
+        };
+
+        await transporter.sendMail(mailOptions);
+      } catch (error) {
+        console.error('Error processing payment failure:', error);
+      }
+      break;
     }
   }
-}));
+
+  res.json({received: true});
+});
+
+// Regular JSON parsing for all other routes
+app.use(express.json());
 
 // MongoDB connection
 const uri = process.env.MONGODB_URI;
@@ -66,7 +170,7 @@ const client = new MongoClient(uri, {
 });
 
 // JWT and OpenAI configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
@@ -90,7 +194,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Password reset request endpoint
-app.post('/api/reset-password', async (req, res) => {
+app.post('/api/reset-password', authLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     const db = client.db('coverLetterGenerator');
@@ -98,15 +202,12 @@ app.post('/api/reset-password', async (req, res) => {
 
     const user = await users.findOne({ email });
     if (!user) {
-      // Still return success to prevent email enumeration
       return res.status(200).json({ message: 'If an account exists with that email, you will receive password reset instructions shortly.' });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
 
-    // Store the reset token and expiry
     await users.updateOne(
       { email },
       {
@@ -117,8 +218,7 @@ app.post('/api/reset-password', async (req, res) => {
       }
     );
 
-    // Send reset email
-    const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
     
     const mailOptions = {
       from: process.env.EMAIL_USER,
@@ -139,19 +239,17 @@ app.post('/api/reset-password', async (req, res) => {
       message: 'If an account exists with that email, you will receive password reset instructions shortly.'
     });
   } catch (error) {
-    console.error('Password reset request error:', error);
     res.status(500).json({ message: 'Error processing password reset request' });
   }
 });
 
 // Password reset confirmation endpoint
-app.post('/api/reset-password/confirm', async (req, res) => {
+app.post('/api/reset-password/confirm', authLimiter, async (req, res) => {
   try {
     const { token, newPassword } = req.body;
     const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
-    // Find user with valid reset token
     const user = await users.findOne({
       resetToken: token,
       resetTokenExpiry: { $gt: new Date() }
@@ -161,10 +259,8 @@ app.post('/api/reset-password/confirm', async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired reset token' });
     }
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password and remove reset token
     await users.updateOne(
       { _id: user._id },
       {
@@ -175,16 +271,14 @@ app.post('/api/reset-password/confirm', async (req, res) => {
 
     res.status(200).json({ message: 'Password successfully reset' });
   } catch (error) {
-    console.error('Password reset confirmation error:', error);
     res.status(500).json({ message: 'Error resetting password' });
   }
 });
 
 // Stripe checkout session endpoint
-app.post('/api/create-checkout-session', async (req, res) => {
+app.post('/api/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     const { planName, planPrice } = req.body;
-    console.log('Creating checkout session for:', { planName, planPrice });
 
     if (!planName || !planPrice) {
       return res.status(400).json({ error: 'Missing required parameters' });
@@ -192,6 +286,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
+      customer_email: req.user.email, // Add customer email for webhook processing
       line_items: [
         {
           price_data: {
@@ -205,52 +300,31 @@ app.post('/api/create-checkout-session', async (req, res) => {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.CLIENT_URL || 'http://localhost:5173'}/success`,
-      cancel_url: `${process.env.CLIENT_URL || 'http://localhost:5173'}`,
+      success_url: `${process.env.CLIENT_URL}/success`,
+      cancel_url: `${process.env.CLIENT_URL}`,
     });
 
     res.json({ id: session.id });
   } catch (error) {
-    console.error('Error creating checkout session:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Error creating checkout session' });
   }
 });
 
-// Test endpoint to verify MongoDB connection and users collection
-app.get('/api/test-db', async (req, res) => {
+// Registration endpoint
+app.post('/api/register', authLimiter, async (req, res) => {
   try {
-    const db = client.db('coverLetterGenerator');
-    const users = db.collection('users');
-    const count = await users.countDocuments();
-    res.json({ message: 'Database connection successful', userCount: count });
-  } catch (error) {
-    console.error('Database test error:', error);
-    res.status(500).json({ message: 'Database connection error', error: error.message });
-  }
-});
-
-// Registration endpoint with debug logging
-app.post('/api/register', async (req, res) => {
-  try {
-    console.log('Registration request received:', req.body);
     const { name, email, password } = req.body;
     const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
-    console.log('Checking for existing user with email:', email);
-    // Check if user already exists
     const existingUser = await users.findOne({ email });
-    console.log('Existing user check result:', existingUser);
 
     if (existingUser) {
-      console.log('User already exists with email:', email);
       return res.status(400).json({ message: 'User with this email already exists' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
     const result = await users.insertOne({
       name,
       email,
@@ -260,20 +334,17 @@ app.post('/api/register', async (req, res) => {
       selectedPlan: 'Free Plan'
     });
 
-    console.log('User successfully registered:', result.insertedId);
-
     res.status(201).json({
       message: 'User registered successfully',
       userId: result.insertedId
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Error registering user', error: error.message });
+    res.status(500).json({ message: 'Error registering user' });
   }
 });
 
 // Login endpoint
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     const db = client.db('coverLetterGenerator');
@@ -301,7 +372,6 @@ app.post('/api/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ message: 'Error logging in' });
   }
 });
@@ -321,7 +391,6 @@ app.put('/api/users/:email', authenticateToken, async (req, res) => {
 
     res.status(200).json({ message: 'User updated successfully' });
   } catch (error) {
-    console.error('Update user error:', error);
     res.status(500).json({ message: 'Error updating user' });
   }
 });
@@ -340,7 +409,6 @@ app.get('/api/users/:email', authenticateToken, async (req, res) => {
 
     res.status(200).json(user);
   } catch (error) {
-    console.error('Get user error:', error);
     res.status(500).json({ message: 'Error retrieving user information' });
   }
 });
@@ -352,10 +420,8 @@ app.post('/api/generate-cover-letter', authenticateToken, async (req, res) => {
     const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
-    // Simple cover letter generation (replace with actual OpenAI implementation)
     const coverLetter = `Dear Hiring Manager,\n\nI am writing to express my interest in the position...\n\nBest regards,\n${personalData.name}`;
 
-    // Update letter count
     await users.updateOne(
       { email: personalData.email },
       { $inc: { letterCount: 1 } }
@@ -363,7 +429,6 @@ app.post('/api/generate-cover-letter', authenticateToken, async (req, res) => {
 
     res.status(200).json({ coverLetter });
   } catch (error) {
-    console.error('Cover letter generation error:', error);
     res.status(500).json({ message: 'Error generating cover letter' });
   }
 });
@@ -381,7 +446,6 @@ app.get('/api/check-auth', authenticateToken, async (req, res) => {
 
     res.status(200).json(user);
   } catch (error) {
-    console.error('Auth check error:', error);
     res.status(500).json({ message: 'Error checking authentication status' });
   }
 });
