@@ -10,12 +10,16 @@ const { OpenAI } = require('openai');
 const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const path = require('path');
 
 // Initialize Stripe with the secret key
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Serve static files from the dist directory
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -448,6 +452,11 @@ app.get('/api/check-auth', authenticateToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Error checking authentication status' });
   }
+});
+
+// Handle client-side routing - must be after API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 // Function to start the server
