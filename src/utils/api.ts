@@ -65,7 +65,7 @@ const handleResponse = async (response: Response) => {
 
 export const login = async (email: string, password: string): Promise<LoginResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const response = await fetch(`${API_BASE_URL}/api/login`, {
       method: 'POST',
       headers: mergeHeaders({}),
       body: JSON.stringify({ email, password }),
@@ -90,7 +90,7 @@ export const logout = () => {
 };
 
 export const registerUser = async (userData: RegistrationData): Promise<RegistrationResponse> => {
-  const response = await fetch(`${API_BASE_URL}/register`, {
+  const response = await fetch(`${API_BASE_URL}/api/register`, {
     method: 'POST',
     headers: mergeHeaders({}),
     body: JSON.stringify(userData),
@@ -99,7 +99,7 @@ export const registerUser = async (userData: RegistrationData): Promise<Registra
 };
 
 export const updateUser = async (email: string, updateData: Partial<PersonalData>) => {
-  const response = await fetch(`${API_BASE_URL}/users/${email}`, {
+  const response = await fetch(`${API_BASE_URL}/api/users/${email}`, {
     method: 'PUT',
     headers: mergeHeaders(getAuthHeaders()),
     body: JSON.stringify(updateData),
@@ -108,14 +108,14 @@ export const updateUser = async (email: string, updateData: Partial<PersonalData
 };
 
 export const getUser = async (email: string): Promise<PersonalData> => {
-  const response = await fetch(`${API_BASE_URL}/users/${email}`, {
+  const response = await fetch(`${API_BASE_URL}/api/users/${email}`, {
     headers: mergeHeaders(getAuthHeaders()),
   });
   return handleResponse(response);
 };
 
 export const generateCoverLetter = async (personalData: PersonalData, jobAd: string): Promise<string> => {
-  const response = await fetch(`${API_BASE_URL}/generate-cover-letter`, {
+  const response = await fetch(`${API_BASE_URL}/api/generate-cover-letter`, {
     method: 'POST',
     headers: mergeHeaders(getAuthHeaders()),
     body: JSON.stringify({ personalData, jobAd }),
@@ -129,7 +129,7 @@ export const checkAuth = async (): Promise<PersonalData | null> => {
     return null;
   }
   try {
-    const response = await fetch(`${API_BASE_URL}/check-auth`, {
+    const response = await fetch(`${API_BASE_URL}/api/check-auth`, {
       headers: mergeHeaders(getAuthHeaders()),
     });
     return handleResponse(response);
@@ -141,7 +141,7 @@ export const checkAuth = async (): Promise<PersonalData | null> => {
 };
 
 export const requestPasswordReset = async (email: string): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/reset-password`, {
+  const response = await fetch(`${API_BASE_URL}/api/reset-password`, {
     method: 'POST',
     headers: mergeHeaders({}),
     body: JSON.stringify({ email }),
@@ -150,7 +150,7 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
 };
 
 export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/reset-password/confirm`, {
+  const response = await fetch(`${API_BASE_URL}/api/reset-password/confirm`, {
     method: 'POST',
     headers: mergeHeaders({}),
     body: JSON.stringify({ token, newPassword }),
