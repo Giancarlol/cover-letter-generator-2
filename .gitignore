@@ -33,3 +33,5 @@ yarn-error.log*
 
 # Local development
 myenv/
+.env.production
+.env.production
