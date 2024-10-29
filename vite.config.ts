@@ -32,6 +32,18 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY),
       'process.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL)
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          assetFileNames: (assetInfo) => {
+            if (assetInfo.name === 'favicon.ico') {
+              return 'favicon.ico';
+            }
+            return 'assets/[name]-[hash][extname]';
+          }
+        }
+      }
     }
   };
 });
