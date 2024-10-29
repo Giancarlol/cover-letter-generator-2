@@ -35,3 +35,5 @@ yarn-error.log*
 myenv/
 .env.production
 .env.production
+cover-letter-generator-2/
+cover-letter-generator-2/
