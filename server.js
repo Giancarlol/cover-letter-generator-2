@@ -18,6 +18,9 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Trust proxy - required for rate limiting behind reverse proxies (like Heroku)
+app.set('trust proxy', 1);
+
 // Serve static files from the dist directory
 app.use(express.static(path.join(__dirname, 'dist')));
 
