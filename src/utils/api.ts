@@ -1,5 +1,5 @@
 // Default to production URL if environment variable is not set
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://tailoredlettersai.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://tailored-letters-app-49dff41a7b95.herokuapp.com';
 
 export interface RegistrationData {
   name: string;
