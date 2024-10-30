@@ -90,11 +90,11 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
         let selectedPlan = 'Free Plan';
         let letterCount = 0;
 
-        // Set plan based on payment amount
-        if (amount === 999) { // $9.99
+        // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
+        if (amount === 399) {
           selectedPlan = 'Basic Plan';
           letterCount = 5;
-        } else if (amount === 1999) { // $19.99
+        } else if (amount === 999) {
           selectedPlan = 'Premium Plan';
           letterCount = 15;
         }
@@ -240,11 +240,11 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
       let selectedPlan = 'Free Plan';
       let letterCount = 0;
 
-      // Set plan based on payment amount
-      if (amount === 999) { // $9.99
+      // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
+      if (amount === 399) {
         selectedPlan = 'Basic Plan';
         letterCount = 5;
-      } else if (amount === 1999) { // $19.99
+      } else if (amount === 999) {
         selectedPlan = 'Premium Plan';
         letterCount = 15;
       }
