@@ -160,7 +160,22 @@ export const resetPassword = async (token: string, newPassword: string): Promise
 
 export const refreshUserData = async (): Promise<PersonalData | null> => {
   try {
-    return await checkAuth();
+    // First get the current user data
+    const currentUser = await checkAuth();
+    if (!currentUser) {
+      return null;
+    }
+
+    // Update the user's plan status on the server
+    const response = await fetch(`${API_BASE_URL}/api/update-plan-status`, {
+      method: 'POST',
+      headers: mergeHeaders(getAuthHeaders()),
+      body: JSON.stringify({ email: currentUser.email }),
+    });
+    await handleResponse(response);
+
+    // Get the fresh user data after plan update
+    return await getUser(currentUser.email);
   } catch (error) {
     console.error('Error refreshing user data:', error);
     return null;
