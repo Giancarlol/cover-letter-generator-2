@@ -106,7 +106,8 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
               selectedPlan,
               letterCount,
               paymentStatus: 'completed',
-              lastPaymentDate: new Date()
+              lastPaymentDate: new Date(),
+              stripeSessionId: session.id  // Store the session ID for reference
             }
           }
         );
@@ -207,48 +208,75 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
-    // Get the latest payment session for this user
-    const latestPayment = await stripe.checkout.sessions.list({
-      limit: 1,
-      customer_email: email,
-      status: 'complete'
-    });
-
-    if (!latestPayment.data.length) {
-      return res.status(404).json({ message: 'No completed payment found' });
+    // First, check if the user exists and get their current data
+    const user = await users.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const session = latestPayment.data[0];
-    const amount = session.amount_total;
-    let selectedPlan = 'Free Plan';
-    let letterCount = 0;
+    try {
+      // Get the latest payment session for this user from the database
+      const userWithSession = await users.findOne(
+        { 
+          email,
+          stripeSessionId: { $exists: true },
+          paymentStatus: 'completed'
+        },
+        { sort: { lastPaymentDate: -1 } }
+      );
 
-    // Set plan based on payment amount
-    if (amount === 999) { // $9.99
-      selectedPlan = 'Basic Plan';
-      letterCount = 5;
-    } else if (amount === 1999) { // $19.99
-      selectedPlan = 'Premium Plan';
-      letterCount = 15;
-    }
-
-    await users.updateOne(
-      { email },
-      { 
-        $set: { 
-          selectedPlan,
-          letterCount,
-          paymentStatus: 'completed',
-          lastPaymentDate: new Date()
-        }
+      if (!userWithSession) {
+        return res.status(404).json({ message: 'No completed payment found' });
       }
-    );
 
-    const updatedUser = await users.findOne({ email }, { projection: { password: 0 } });
-    res.status(200).json(updatedUser);
+      // Verify the session with Stripe
+      const session = await stripe.checkout.sessions.retrieve(userWithSession.stripeSessionId);
+      
+      if (!session || session.status !== 'complete') {
+        return res.status(400).json({ message: 'Invalid or incomplete payment session' });
+      }
+
+      const amount = session.amount_total;
+      let selectedPlan = 'Free Plan';
+      let letterCount = 0;
+
+      // Set plan based on payment amount
+      if (amount === 999) { // $9.99
+        selectedPlan = 'Basic Plan';
+        letterCount = 5;
+      } else if (amount === 1999) { // $19.99
+        selectedPlan = 'Premium Plan';
+        letterCount = 15;
+      }
+
+      // Update user with plan details
+      await users.updateOne(
+        { email },
+        { 
+          $set: { 
+            selectedPlan,
+            letterCount,
+            paymentStatus: 'completed',
+            lastPaymentDate: new Date()
+          }
+        }
+      );
+
+      const updatedUser = await users.findOne({ email }, { projection: { password: 0 } });
+      res.status(200).json(updatedUser);
+    } catch (stripeError) {
+      console.error('Stripe API Error:', stripeError);
+      res.status(500).json({ 
+        message: 'Error verifying payment with Stripe',
+        details: stripeError.message
+      });
+    }
   } catch (error) {
-    console.error('Error updating plan status:', error);
-    res.status(500).json({ message: 'Error updating plan status' });
+    console.error('Server Error:', error);
+    res.status(500).json({ 
+      message: 'Error updating plan status',
+      details: error.message
+    });
   }
 });
 
