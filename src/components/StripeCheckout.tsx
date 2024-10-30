@@ -27,6 +27,12 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
         throw new Error('Failed to initialize Stripe');
       }
 
+      // Get the auth token from localStorage
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken) {
+        throw new Error('Authentication required');
+      }
+
       console.log('Making request to create checkout session');
       console.log('Request payload:', { planName, planPrice });
 
@@ -35,6 +41,7 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           planName,
