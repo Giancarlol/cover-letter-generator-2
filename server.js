@@ -200,6 +200,58 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Update plan status endpoint
+app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const db = client.db('coverLetterGenerator');
+    const users = db.collection('users');
+
+    // Get the latest payment session for this user
+    const latestPayment = await stripe.checkout.sessions.list({
+      limit: 1,
+      customer_email: email,
+      status: 'complete'
+    });
+
+    if (!latestPayment.data.length) {
+      return res.status(404).json({ message: 'No completed payment found' });
+    }
+
+    const session = latestPayment.data[0];
+    const amount = session.amount_total;
+    let selectedPlan = 'Free Plan';
+    let letterCount = 0;
+
+    // Set plan based on payment amount
+    if (amount === 999) { // $9.99
+      selectedPlan = 'Basic Plan';
+      letterCount = 5;
+    } else if (amount === 1999) { // $19.99
+      selectedPlan = 'Premium Plan';
+      letterCount = 15;
+    }
+
+    await users.updateOne(
+      { email },
+      { 
+        $set: { 
+          selectedPlan,
+          letterCount,
+          paymentStatus: 'completed',
+          lastPaymentDate: new Date()
+        }
+      }
+    );
+
+    const updatedUser = await users.findOne({ email }, { projection: { password: 0 } });
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error('Error updating plan status:', error);
+    res.status(500).json({ message: 'Error updating plan status' });
+  }
+});
+
 // Password reset request endpoint
 app.post('/api/reset-password', authLimiter, async (req, res) => {
   try {
