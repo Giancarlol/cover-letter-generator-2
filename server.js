@@ -291,6 +291,9 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    // Get the base URL from the request
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: req.user.email, // Add customer email for webhook processing
@@ -307,8 +310,8 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.CLIENT_URL}/success`,
-      cancel_url: `${process.env.CLIENT_URL}`,
+      success_url: `${baseUrl}/success`,
+      cancel_url: `${baseUrl}`,
     });
 
     res.json({ id: session.id });
