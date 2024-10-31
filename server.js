@@ -90,13 +90,13 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
         let selectedPlan = 'Free Plan';
         let letterCount = 0;
 
-        // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
-        if (amount === 399) {
+        // Set plan based on payment amount (499 = $4.99, 899 = $8.99)
+        if (amount === 499) {
           selectedPlan = 'Basic Plan';
-          letterCount = 5;
-        } else if (amount === 999) {
+          letterCount = 20;
+        } else if (amount === 899) {
           selectedPlan = 'Premium Plan';
-          letterCount = 15;
+          letterCount = 40;
         }
 
         await users.updateOne(
@@ -240,13 +240,13 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
       let selectedPlan = 'Free Plan';
       let letterCount = 0;
 
-      // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
-      if (amount === 399) {
+      // Set plan based on payment amount (499 = $4.99, 899 = $8.99)
+      if (amount === 499) {
         selectedPlan = 'Basic Plan';
-        letterCount = 5;
-      } else if (amount === 999) {
+        letterCount = 20;
+      } else if (amount === 899) {
         selectedPlan = 'Premium Plan';
-        letterCount = 15;
+        letterCount = 40;
       }
 
       // Update user with plan details
@@ -384,7 +384,7 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
             product_data: {
               name: planName,
             },
-            unit_amount: planPrice * 100, // Convert to cents
+            unit_amount: planPrice, // Price is already in cents from frontend
           },
           quantity: 1,
         },
