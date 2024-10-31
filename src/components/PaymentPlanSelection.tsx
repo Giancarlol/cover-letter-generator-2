@@ -19,13 +19,13 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClos
     { 
       name: 'Basic Plan', 
       price: 399, // Price in cents for Stripe
-      letters: 5, 
+      letters: 20, 
       features: ['5 letters per month', 'More templates', 'Priority support'] 
     },
     { 
       name: 'Premium Plan', 
       price: 999, // Price in cents for Stripe
-      letters: 15, 
+      letters: 40, 
       features: ['15 letters per month', 'All templates', '24/7 support', 'Advanced customization'] 
     },
   ];
