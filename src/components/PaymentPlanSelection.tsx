@@ -18,14 +18,14 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClos
     },
     { 
       name: 'Basic Plan', 
-      price: 3.99,  // Updated price to match server.js
-      letters: 5,   // Updated letter count to match server.js
+      price: 399, // Price in cents for Stripe
+      letters: 5, 
       features: ['5 letters per month', 'More templates', 'Priority support'] 
     },
     { 
       name: 'Premium Plan', 
-      price: 9.99,  // Updated price to match server.js
-      letters: 15,  // Updated letter count to match server.js
+      price: 999, // Price in cents for Stripe
+      letters: 15, 
       features: ['15 letters per month', 'All templates', '24/7 support', 'Advanced customization'] 
     },
   ];
@@ -57,7 +57,7 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClos
                 <h3 className="text-lg leading-6 font-medium text-gray-900">{plan.name}</h3>
                 <p className="mt-4 text-sm text-gray-500">{plan.letters} letters per month</p>
                 <p className="mt-8">
-                  <span className="text-4xl font-extrabold text-gray-900">${plan.price.toFixed(2)}</span>
+                  <span className="text-4xl font-extrabold text-gray-900">${(plan.price / 100).toFixed(2)}</span>
                   {plan.price !== 0 && <span className="text-base font-medium text-gray-500">/mo</span>}
                 </p>
                 {plan.price === 0 ? (
@@ -74,7 +74,7 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClos
                 ) : (
                   <StripeCheckout
                     planName={plan.name}
-                    planPrice={plan.price * 100} // Convert to cents for Stripe
+                    planPrice={plan.price} // Price already in cents for Stripe
                     onError={handleError}
                   />
                 )}
