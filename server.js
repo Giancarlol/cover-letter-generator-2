@@ -384,7 +384,7 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
             product_data: {
               name: planName,
             },
-            unit_amount: planPrice * 100, // Convert to cents
+            unit_amount: planPrice, // in cents
           },
           quantity: 1,
         },
