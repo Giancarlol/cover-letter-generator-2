@@ -26,22 +26,23 @@ export interface RegistrationResponse {
   userId: string;
 }
 
-let authToken: string | null = localStorage.getItem('authToken');
+// Retrieve token from localStorage each time to ensure latest state
+const getAuthHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem('authToken'); // Always fetch token directly from localStorage
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
+// Store the token in both the variable and localStorage
 const setAuthToken = (token: string) => {
-  authToken = token;
   localStorage.setItem('authToken', token);
 };
 
+// Clear the token from both localStorage and variable
 export const clearAuthToken = () => {
-  authToken = null;
   localStorage.removeItem('authToken');
 };
 
-const getAuthHeaders = (): Record<string, string> => {
-  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
-};
-
+// Merge headers with Content-Type and Authorization
 const mergeHeaders = (headers: Record<string, string>): HeadersInit => {
   return {
     ...headers,
@@ -49,20 +50,19 @@ const mergeHeaders = (headers: Record<string, string>): HeadersInit => {
   };
 };
 
+// Handle the API response, checking for JSON content and handling errors
 const handleResponse = async (response: Response) => {
   const contentType = response.headers.get('content-type');
   if (!response.ok) {
-    const errorData = contentType?.includes('application/json') 
+    const errorData = contentType?.includes('application/json')
       ? await response.json()
       : { message: 'An error occurred' };
     throw new Error(errorData.message || 'An error occurred');
   }
-  if (contentType?.includes('application/json')) {
-    return response.json();
-  }
-  return response.text();
+  return contentType?.includes('application/json') ? response.json() : response.text();
 };
 
+// Login function with token storage and user data fetching
 export const login = async (email: string, password: string): Promise<LoginResponse> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/login`, {
@@ -72,7 +72,7 @@ export const login = async (email: string, password: string): Promise<LoginRespo
     });
     const data = await handleResponse(response);
     setAuthToken(data.token);
-    
+
     // Fetch fresh user data after login
     const userData = await getUser(email);
     return {
@@ -85,10 +85,12 @@ export const login = async (email: string, password: string): Promise<LoginRespo
   }
 };
 
+// Logout by clearing the token
 export const logout = () => {
   clearAuthToken();
 };
 
+// Register a user
 export const registerUser = async (userData: RegistrationData): Promise<RegistrationResponse> => {
   const response = await fetch(`${API_BASE_URL}/api/register`, {
     method: 'POST',
@@ -98,6 +100,7 @@ export const registerUser = async (userData: RegistrationData): Promise<Registra
   return handleResponse(response);
 };
 
+// Update user data with authorization
 export const updateUser = async (email: string, updateData: Partial<PersonalData>) => {
   const response = await fetch(`${API_BASE_URL}/api/users/${email}`, {
     method: 'PUT',
@@ -107,6 +110,7 @@ export const updateUser = async (email: string, updateData: Partial<PersonalData
   return handleResponse(response);
 };
 
+// Get user data with authorization
 export const getUser = async (email: string): Promise<PersonalData> => {
   const response = await fetch(`${API_BASE_URL}/api/users/${email}`, {
     headers: mergeHeaders(getAuthHeaders()),
@@ -114,6 +118,7 @@ export const getUser = async (email: string): Promise<PersonalData> => {
   return handleResponse(response);
 };
 
+// Generate cover letter with authorization
 export const generateCoverLetter = async (personalData: PersonalData, jobAd: string): Promise<string> => {
   const response = await fetch(`${API_BASE_URL}/api/generate-cover-letter`, {
     method: 'POST',
@@ -124,8 +129,10 @@ export const generateCoverLetter = async (personalData: PersonalData, jobAd: str
   return data.coverLetter;
 };
 
+// Check authentication by verifying token
 export const checkAuth = async (): Promise<PersonalData | null> => {
-  if (!authToken) {
+  const token = localStorage.getItem('authToken');
+  if (!token) {
     return null;
   }
   try {
@@ -140,6 +147,7 @@ export const checkAuth = async (): Promise<PersonalData | null> => {
   }
 };
 
+// Request password reset
 export const requestPasswordReset = async (email: string): Promise<void> => {
   const response = await fetch(`${API_BASE_URL}/api/reset-password`, {
     method: 'POST',
@@ -149,6 +157,7 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
   return handleResponse(response);
 };
 
+// Reset password
 export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
   const response = await fetch(`${API_BASE_URL}/api/reset-password/confirm`, {
     method: 'POST',
@@ -158,9 +167,9 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   return handleResponse(response);
 };
 
+// Refresh user data after updating the plan status
 export const refreshUserData = async (): Promise<PersonalData | null> => {
   try {
-    // First get the current user data
     const currentUser = await checkAuth();
     if (!currentUser) {
       return null;
