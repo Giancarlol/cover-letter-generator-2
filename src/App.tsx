@@ -9,7 +9,7 @@ import PersonalDataForm from './components/PersonalDataForm';
 import PaymentPlanSelection from './components/PaymentPlanSelection';
 import PaymentSuccess from './components/PaymentSuccess';
 import ResetPassword from './components/ResetPassword';
-import { checkAuth, clearAuthToken, registerUser } from './utils/api';
+import { checkAuth, clearAuthToken, registerUser, login } from './utils/api';
 import type { PersonalData, RegistrationData } from './utils/api';
 
 // Initialize Stripe
@@ -44,21 +44,16 @@ function App() {
 
   const handleRegister = async (userData: RegistrationData) => {
     try {
-      // The registration endpoint returns { message: string, userId: string }
+      // First register the user
       const response = await registerUser(userData);
-      // After successful registration, we should log the user in
+      
       if (response.userId) {
-        // Create a PersonalData object from the registration data
-        const user: PersonalData = {
-          name: userData.name,
-          email: userData.email,
-          studies: '',
-          experiences: [],
-          selectedPlan: 'Free Plan',
-          letterCount: 0
-        };
+        // After successful registration, perform login
+        const loginResponse = await login(userData.email, userData.password);
+        
+        // Set authentication state with the logged-in user data
         setIsAuthenticated(true);
-        setUserData(user);
+        setUserData(loginResponse.user);
       }
     } catch (error) {
       // Re-throw the error so the RegistrationForm can handle it
