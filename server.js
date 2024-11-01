@@ -16,14 +16,15 @@ const path = require('path');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
-const port = process.env.PORT || 3001;
 
-// Trust proxy - required for rate limiting behind reverse proxies (like Heroku)
+// Trust proxy - MUST be set before any other middleware
 app.set('trust proxy', 1);
 
-// CORS configuration first - allow both CLIENT_URL and the Heroku app URL
+const port = process.env.PORT || 3001;
+
+// CORS configuration
 app.use(cors({
-  origin: [process.env.CLIENT_URL, 'https://tailored-letters-app-49dff41a7b95.herokuapp.com/'],
+  origin: [process.env.CLIENT_URL, 'https://tailored-letters-app-49dff41a7b95.herokuapp.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -44,7 +45,15 @@ app.use(express.static(path.join(__dirname, 'dist')));
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'Too many requests, please try again later.',
+      details: 'Rate limit exceeded'
+    });
+  }
 });
 
 app.use(limiter);
@@ -52,7 +61,15 @@ app.use(limiter);
 // Additional rate limits for sensitive endpoints
 const authLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5 // limit each IP to 5 requests per windowMs
+  max: 5, // limit each IP to 5 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'Too many authentication attempts, please try again later.',
+      details: 'Authentication rate limit exceeded'
+    });
+  }
 });
 
 // Email transporter setup
@@ -434,5 +451,3 @@ app.listen(port, () => {
 
 // Export the app for testing
 module.exports = app;
-
-//hshshsh
