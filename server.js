@@ -24,7 +24,7 @@ const port = process.env.PORT || 3001;
 
 // CORS configuration
 app.use(cors({
-  origin: [process.env.CLIENT_URL, 'https://tailored-letters-app-49dff41a7b95.herokuapp.com/'],
+  origin: [process.env.CLIENT_URL, 'https://tailored-letters-app-49dff41a7b95.herokuapp.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -219,12 +219,13 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Update plan status endpoint
+// Update plan status endpoint - Modified to handle both req.user.email and req.body.email
 app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
-  console.log('Updating plan status for user:', req.user.email);
-  
   try {
-    const { email } = req.user;
+    // Get email from either the authenticated user or request body
+    const email = req.user.email || req.body.email;
+    console.log('Updating plan status for user:', email);
+    
     const users = db.collection('users');
 
     // First, check if the user exists and get their current data
@@ -236,8 +237,8 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
 
     console.log('Found user:', user);
 
-    // Get the latest payment session for this user from the database
-    const userWithSession = await users.findOne(
+    // Get the latest payment for this user from the database
+    const userWithPayment = await users.findOne(
       { 
         email,
         paymentStatus: 'completed'
@@ -245,12 +246,12 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
       { sort: { lastPaymentDate: -1 } }
     );
 
-    if (!userWithSession) {
+    if (!userWithPayment) {
       console.log('No completed payment found for user:', email);
       return res.status(404).json({ message: 'No completed payment found' });
     }
 
-    console.log('Found payment session:', userWithSession);
+    console.log('Found payment details:', userWithPayment);
 
     // Return the updated user data
     const updatedUser = await users.findOne({ email }, { projection: { password: 0 } });
