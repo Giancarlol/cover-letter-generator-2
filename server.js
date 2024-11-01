@@ -23,7 +23,7 @@ app.set('trust proxy', 1);
 
 // CORS configuration first - allow both CLIENT_URL and the Heroku app URL
 app.use(cors({
-  origin: [process.env.CLIENT_URL, 'https://tailored-letters-app-49dff41a7b95.herokuapp.com'],
+  origin: [process.env.CLIENT_URL, 'https://tailored-letters-app-49dff41a7b95.herokuapp.com/'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -434,3 +434,5 @@ app.listen(port, () => {
 
 // Export the app for testing
 module.exports = app;
+
+//hshshsh
