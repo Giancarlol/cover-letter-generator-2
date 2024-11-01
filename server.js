@@ -21,9 +21,9 @@ const port = process.env.PORT || 3001;
 // Trust proxy - required for rate limiting behind reverse proxies (like Heroku)
 app.set('trust proxy', 1);
 
-// CORS configuration first
+// CORS configuration first - allow both CLIENT_URL and the Heroku app URL
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+  origin: [process.env.CLIENT_URL, 'https://tailored-letters-app-49dff41a7b95.herokuapp.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -77,6 +77,18 @@ const client = new MongoClient(uri, {
   useUnifiedTopology: true,
 });
 
+// Connect to MongoDB at startup
+let db;
+client.connect()
+  .then(() => {
+    console.log('Connected to MongoDB');
+    db = client.db('coverLetterGenerator');
+  })
+  .catch(err => {
+    console.error('Error connecting to MongoDB:', err);
+    process.exit(1);
+  });
+
 // This is your Stripe CLI webhook secret for testing your endpoint locally.
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -101,7 +113,6 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
     console.log('Processing completed checkout session:', session.id);
     
     try {
-      const db = client.db('coverLetterGenerator');
       const users = db.collection('users');
 
       // Get customer email directly from the session
@@ -164,11 +175,8 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
   res.json({received: true});
 });
 
-// JWT and OpenAI configuration
+// JWT configuration
 const JWT_SECRET = process.env.JWT_SECRET;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -194,7 +202,6 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
   
   try {
     const { email } = req.user;
-    const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
     // First, check if the user exists and get their current data
@@ -239,7 +246,6 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
 app.post('/api/register', authLimiter, async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
     const existingUser = await users.findOne({ email });
@@ -272,7 +278,6 @@ app.post('/api/register', authLimiter, async (req, res) => {
 app.post('/api/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
-    const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
     const user = await users.findOne({ email });
@@ -306,7 +311,6 @@ app.put('/api/users/:email', authenticateToken, async (req, res) => {
   try {
     const { email } = req.params;
     const updateData = req.body;
-    const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
     await users.updateOne(
@@ -324,7 +328,6 @@ app.put('/api/users/:email', authenticateToken, async (req, res) => {
 app.get('/api/users/:email', authenticateToken, async (req, res) => {
   try {
     const { email } = req.params;
-    const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
     const user = await users.findOne({ email }, { projection: { password: 0 } });
@@ -342,7 +345,6 @@ app.get('/api/users/:email', authenticateToken, async (req, res) => {
 app.post('/api/generate-cover-letter', authenticateToken, async (req, res) => {
   try {
     const { personalData, jobAd } = req.body;
-    const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
     const coverLetter = `Dear Hiring Manager,\n\nI am writing to express my interest in the position...\n\nBest regards,\n${personalData.name}`;
@@ -361,7 +363,6 @@ app.post('/api/generate-cover-letter', authenticateToken, async (req, res) => {
 // Check authentication status
 app.get('/api/check-auth', authenticateToken, async (req, res) => {
   try {
-    const db = client.db('coverLetterGenerator');
     const users = db.collection('users');
 
     const user = await users.findOne({ email: req.user.email }, { projection: { password: 0 } });
@@ -420,25 +421,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Function to start the server
-const startServer = async () => {
-  try {
-    await client.connect();
-    console.log('Connected to MongoDB');
-
-    app.listen(port, () => {
-      console.log(`Server running on port ${port}`);
-    });
-  } catch (error) {
-    console.error('Error connecting to MongoDB:', error);
-    process.exit(1);
-  }
-};
-
-// Only start the server if this file is run directly
-if (require.main === module) {
-  startServer();
-}
+// Start the server
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
 
 // Export the app for testing
 module.exports = app;
