@@ -9,6 +9,9 @@ const PaymentSuccess: React.FC = () => {
   useEffect(() => {
     const handlePaymentSuccess = async () => {
       try {
+        // Add a delay to allow webhook processing to complete
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
         const userData = await refreshUserData();
         if (!userData) {
           throw new Error('Failed to update plan status');
