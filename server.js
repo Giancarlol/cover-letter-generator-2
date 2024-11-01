@@ -21,6 +21,23 @@ const port = process.env.PORT || 3001;
 // Trust proxy - required for rate limiting behind reverse proxies (like Heroku)
 app.set('trust proxy', 1);
 
+// CORS configuration first
+app.use(cors({
+  origin: process.env.CLIENT_URL,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// Regular JSON parsing for all routes except webhook
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/webhook') {
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
+
 // Serve static files from the dist directory
 app.use(express.static(path.join(__dirname, 'dist')));
 
@@ -47,14 +64,6 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// CORS configuration
-app.use(cors({
-  origin: process.env.CLIENT_URL,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
-
 // MongoDB connection
 const uri = process.env.MONGODB_URI;
 
@@ -74,86 +83,86 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 // Special raw body parsing for Stripe webhooks
 app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
   const sig = req.headers['stripe-signature'];
+  console.log('Received webhook');
 
   let event;
 
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    console.log('Webhook event type:', event.type);
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   // Handle the event
-  switch (event.type) {
-    case 'checkout.session.completed': {
-      const session = event.data.object;
-      
-      try {
-        await client.connect();
-        const db = client.db('coverLetterGenerator');
-        const users = db.collection('users');
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    console.log('Processing completed checkout session:', session.id);
+    
+    try {
+      const db = client.db('coverLetterGenerator');
+      const users = db.collection('users');
 
-        // Get customer email directly from the session
-        const customerEmail = session.customer_details.email;
+      // Get customer email directly from the session
+      const customerEmail = session.customer_details.email;
+      console.log('Customer email:', customerEmail);
 
-        // Get the payment amount to determine the plan
-        const amount = session.amount_total;
-        let selectedPlan = 'Free Plan';
-        let letterCount = 0;
+      // Get the payment amount to determine the plan
+      const amount = session.amount_total;
+      let selectedPlan = 'Free Plan';
+      let letterCount = 0;
 
-        // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
-        if (amount === 399) {
-          selectedPlan = 'Basic Plan';
-          letterCount = 5;
-        } else if (amount === 999) {
-          selectedPlan = 'Premium Plan';
-          letterCount = 15;
-        }
-
-        // Update user with payment details
-        const updateResult = await users.updateOne(
-          { email: customerEmail },
-          { 
-            $set: { 
-              selectedPlan,
-              letterCount,
-              paymentStatus: 'completed',
-              lastPaymentDate: new Date(),
-              stripeSessionId: session.id
-            }
-          }
-        );
-
-        console.log('User update result:', updateResult);
-
-        // Send confirmation email
-        const mailOptions = {
-          from: process.env.EMAIL_USER,
-          to: customerEmail,
-          subject: 'Payment Confirmation - Cover Letter Generator',
-          html: `
-            <h1>Thank you for your purchase!</h1>
-            <p>Your payment has been successfully processed.</p>
-            <p>Plan: ${selectedPlan}</p>
-            <p>Available letter generations: ${letterCount}</p>
-            <p>If you have any questions, please don't hesitate to contact us.</p>
-          `
-        };
-
-        await transporter.sendMail(mailOptions);
-      } catch (error) {
-        console.error('Error processing webhook:', error);
+      // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
+      if (amount === 399) {
+        selectedPlan = 'Basic Plan';
+        letterCount = 5;
+      } else if (amount === 999) {
+        selectedPlan = 'Premium Plan';
+        letterCount = 15;
       }
-      break;
+
+      console.log('Updating user plan:', { selectedPlan, letterCount });
+
+      // Update user with payment details
+      const updateResult = await users.updateOne(
+        { email: customerEmail },
+        { 
+          $set: { 
+            selectedPlan,
+            letterCount,
+            paymentStatus: 'completed',
+            lastPaymentDate: new Date(),
+            stripeSessionId: session.id
+          }
+        }
+      );
+
+      console.log('User update result:', updateResult);
+
+      // Send confirmation email
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: customerEmail,
+        subject: 'Payment Confirmation - Cover Letter Generator',
+        html: `
+          <h1>Thank you for your purchase!</h1>
+          <p>Your payment has been successfully processed.</p>
+          <p>Plan: ${selectedPlan}</p>
+          <p>Available letter generations: ${letterCount}</p>
+          <p>If you have any questions, please don't hesitate to contact us.</p>
+        `
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log('Confirmation email sent');
+    } catch (error) {
+      console.error('Error processing webhook:', error);
     }
   }
 
   res.json({received: true});
 });
-
-// Regular JSON parsing for all other routes
-app.use(express.json());
 
 // JWT and OpenAI configuration
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -181,6 +190,8 @@ const authenticateToken = (req, res, next) => {
 
 // Update plan status endpoint
 app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
+  console.log('Updating plan status for user:', req.user.email);
+  
   try {
     const { email } = req.user;
     const db = client.db('coverLetterGenerator');
@@ -189,8 +200,11 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     // First, check if the user exists and get their current data
     const user = await users.findOne({ email });
     if (!user) {
+      console.log('User not found:', email);
       return res.status(404).json({ message: 'User not found' });
     }
+
+    console.log('Found user:', user);
 
     // Get the latest payment session for this user from the database
     const userWithSession = await users.findOne(
@@ -202,11 +216,15 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     );
 
     if (!userWithSession) {
+      console.log('No completed payment found for user:', email);
       return res.status(404).json({ message: 'No completed payment found' });
     }
 
+    console.log('Found payment session:', userWithSession);
+
     // Return the updated user data
     const updatedUser = await users.findOne({ email }, { projection: { password: 0 } });
+    console.log('Returning updated user data:', updatedUser);
     res.status(200).json(updatedUser);
   } catch (error) {
     console.error('Server Error:', error);
@@ -389,6 +407,7 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       cancel_url: `${baseUrl}`,
     });
 
+    console.log('Created checkout session:', session.id);
     res.json({ id: session.id });
   } catch (error) {
     console.error('Error creating checkout session:', error);
