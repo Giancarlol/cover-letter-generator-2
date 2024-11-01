@@ -108,19 +108,24 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
   }
 
   // Handle the event
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    console.log('Processing completed checkout session:', session.id);
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object;
+    console.log('Processing payment intent:', paymentIntent.id);
     
     try {
       const users = db.collection('users');
 
-      // Get customer email directly from the session
-      const customerEmail = session.customer_details.email;
+      // Get the payment details
+      const amount = paymentIntent.amount;
+      const customerEmail = paymentIntent.receipt_email || paymentIntent.customer_email;
+      
+      if (!customerEmail) {
+        console.error('No customer email found in payment intent');
+        return res.status(400).json({ error: 'No customer email found' });
+      }
+
       console.log('Customer email:', customerEmail);
 
-      // Get the payment amount to determine the plan
-      const amount = session.amount_total;
       let selectedPlan = 'Free Plan';
       let letterCount = 0;
 
@@ -144,7 +149,7 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
             letterCount,
             paymentStatus: 'completed',
             lastPaymentDate: new Date(),
-            stripeSessionId: session.id
+            stripePaymentIntentId: paymentIntent.id
           }
         }
       );
@@ -169,6 +174,7 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
       console.log('Confirmation email sent');
     } catch (error) {
       console.error('Error processing webhook:', error);
+      return res.status(500).json({ error: 'Error processing webhook' });
     }
   }
 
