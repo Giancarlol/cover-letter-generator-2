@@ -68,6 +68,10 @@ function App() {
     setShowPaymentPlan(false);
   };
 
+  const handleUpdateUser = (updatedUserData: PersonalData) => {
+    setUserData(updatedUserData);
+  };
+
   return (
     <Elements stripe={stripePromise}>
       <div className="min-h-screen bg-gray-100">
@@ -81,6 +85,9 @@ function App() {
               </div>
               {isAuthenticated && (
                 <div className="flex items-center">
+                  <div className="mr-4 text-sm text-gray-600">
+                    Current Plan: {userData?.selectedPlan || 'Free Plan'}
+                  </div>
                   <button
                     onClick={() => setShowPaymentPlan(true)}
                     className="mr-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
@@ -143,7 +150,7 @@ function App() {
                 )
               }
             />
-            <Route path="/success" element={<PaymentSuccess />} />
+            <Route path="/success" element={<PaymentSuccess onUpdateUser={handleUpdateUser} />} />
             <Route path="/reset-password" element={<ResetPassword />} />
           </Routes>
         </main>

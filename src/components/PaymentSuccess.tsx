@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { refreshUserData } from '../utils/api';
+import type { PersonalData } from '../utils/api';
 
-const PaymentSuccess: React.FC = () => {
+interface PaymentSuccessProps {
+  onUpdateUser?: (userData: PersonalData) => void;
+}
+
+const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
@@ -16,6 +21,12 @@ const PaymentSuccess: React.FC = () => {
         if (!userData) {
           throw new Error('Failed to update plan status');
         }
+        
+        // Update the parent component's state with the new user data
+        if (onUpdateUser) {
+          onUpdateUser(userData);
+        }
+        
         // Navigate back to the main page after successful update
         navigate('/');
       } catch (error) {
@@ -27,7 +38,7 @@ const PaymentSuccess: React.FC = () => {
     };
 
     handlePaymentSuccess();
-  }, [navigate]);
+  }, [navigate, onUpdateUser]);
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
