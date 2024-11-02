@@ -20,15 +20,26 @@ function App() {
   const [userData, setUserData] = useState<PersonalData | null>(null);
   const [showPaymentPlan, setShowPaymentPlan] = useState(false);
 
-  useEffect(() => {
-    const verifyAuth = async () => {
+  const loadUserData = async () => {
+    try {
       const user = await checkAuth();
       if (user) {
+        console.log('Loaded user data:', user);
         setIsAuthenticated(true);
         setUserData(user);
+      } else {
+        setIsAuthenticated(false);
+        setUserData(null);
       }
-    };
-    verifyAuth();
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      setIsAuthenticated(false);
+      setUserData(null);
+    }
+  };
+
+  useEffect(() => {
+    loadUserData();
   }, []);
 
   const handleLogout = () => {
@@ -37,39 +48,43 @@ function App() {
     setUserData(null);
   };
 
-  const handleLogin = (user: PersonalData) => {
+  const handleLogin = async (user: PersonalData) => {
     setIsAuthenticated(true);
     setUserData(user);
+    // Reload user data to ensure we have the latest plan info
+    await loadUserData();
   };
 
   const handleRegister = async (userData: RegistrationData) => {
     try {
-      // First register the user
       const response = await registerUser(userData);
       
       if (response.userId) {
-        // After successful registration, perform login
         const loginResponse = await login(userData.email, userData.password);
-        
-        // Set authentication state with the logged-in user data
         setIsAuthenticated(true);
         setUserData(loginResponse.user);
+        // Reload user data to ensure we have the latest plan info
+        await loadUserData();
       }
     } catch (error) {
-      // Re-throw the error so the RegistrationForm can handle it
       throw error;
     }
   };
 
-  const handleSelectPlan = (plan: string) => {
+  const handleSelectPlan = async (plan: string) => {
     if (userData) {
       setUserData({ ...userData, selectedPlan: plan });
+      // Reload user data to ensure we have the latest plan info
+      await loadUserData();
     }
     setShowPaymentPlan(false);
   };
 
-  const handleUpdateUser = (updatedUserData: PersonalData) => {
+  const handleUpdateUser = async (updatedUserData: PersonalData) => {
+    console.log('Updating user data:', updatedUserData);
     setUserData(updatedUserData);
+    // Reload user data to ensure we have the latest plan info
+    await loadUserData();
   };
 
   return (
@@ -150,7 +165,14 @@ function App() {
                 )
               }
             />
-            <Route path="/success" element={<PaymentSuccess onUpdateUser={handleUpdateUser} />} />
+            <Route 
+              path="/success" 
+              element={
+                <PaymentSuccess 
+                  onUpdateUser={handleUpdateUser} 
+                />
+              } 
+            />
             <Route path="/reset-password" element={<ResetPassword />} />
           </Routes>
         </main>

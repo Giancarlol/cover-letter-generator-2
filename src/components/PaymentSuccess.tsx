@@ -17,14 +17,18 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
         // Add a delay to allow webhook processing to complete
         await new Promise(resolve => setTimeout(resolve, 3000));
         
+        console.log('Refreshing user data after payment...');
         const userData = await refreshUserData();
+        console.log('Refreshed user data:', userData);
+        
         if (!userData) {
           throw new Error('Failed to update plan status');
         }
         
         // Update the parent component's state with the new user data
         if (onUpdateUser) {
-          onUpdateUser(userData);
+          console.log('Calling onUpdateUser with:', userData);
+          await onUpdateUser(userData);
         }
         
         // Navigate back to the main page after successful update
