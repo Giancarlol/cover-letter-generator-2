@@ -22,16 +22,6 @@ app.set('trust proxy', 1);
 
 const port = process.env.PORT || 3001;
 
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  console.log('Headers:', req.headers);
-  if (req.body && Object.keys(req.body).length > 0) {
-    console.log('Body:', req.body);
-  }
-  next();
-});
-
 // CORS configuration
 app.use(cors({
   origin: [process.env.CLIENT_URL, 'https://tailored-letters-app-49dff41a7b95.herokuapp.com'],
@@ -49,26 +39,10 @@ app.use((req, res, next) => {
   }
 });
 
-// Serve static files from the dist directory
-app.use(express.static(path.join(__dirname, 'dist')));
-
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    console.log('Rate limit exceeded:', {
-      ip: req.ip,
-      path: req.path,
-      headers: req.headers
-    });
-    res.status(429).json({
-      error: 'Too many requests, please try again later.',
-      details: 'Rate limit exceeded'
-    });
-  }
+  max: 100 // limit each IP to 100 requests per windowMs
 });
 
 app.use(limiter);
@@ -76,20 +50,7 @@ app.use(limiter);
 // Additional rate limits for sensitive endpoints
 const authLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // limit each IP to 5 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    console.log('Auth rate limit exceeded:', {
-      ip: req.ip,
-      path: req.path,
-      headers: req.headers
-    });
-    res.status(429).json({
-      error: 'Too many authentication attempts, please try again later.',
-      details: 'Authentication rate limit exceeded'
-    });
-  }
+  max: 5 // limit each IP to 5 requests per windowMs
 });
 
 // Email transporter setup
@@ -126,151 +87,70 @@ client.connect()
     process.exit(1);
   });
 
-// Authentication middleware with detailed logging
-const authenticateToken = (req, res, next) => {
-  console.log('Authenticating request:', {
-    path: req.path,
-    method: req.method,
-    headers: req.headers
-  });
+// This is your Stripe CLI webhook secret for testing your endpoint locally.
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+// JWT configuration
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    console.log('No token provided');
     return res.status(401).json({ message: 'Authentication token required' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      console.error('Token verification failed:', err);
       return res.status(401).json({ message: 'Invalid or expired token' });
     }
-    console.log('Token verified successfully for user:', user);
     req.user = user;
     next();
   });
 };
 
-// Update plan status endpoint with detailed logging
-app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
-  console.log('Received update-plan-status request');
-  console.log('Request headers:', req.headers);
-  console.log('Request body:', req.body);
-  console.log('Authenticated user:', req.user);
+// API Routes
 
-  try {
-    // Get email from either the authenticated user or request body
-    const email = req.user.email || req.body.email;
-    console.log('Processing update for email:', email);
-    
-    if (!email) {
-      console.error('No email found in request');
-      return res.status(400).json({ 
-        message: 'Email is required',
-        debug: {
-          user: req.user,
-          body: req.body
-        }
-      });
-    }
-
-    const users = db.collection('users');
-
-    // First, check if the user exists and get their current data
-    const user = await users.findOne({ email });
-    if (!user) {
-      console.log('User not found:', email);
-      return res.status(404).json({ 
-        message: 'User not found',
-        debug: { email }
-      });
-    }
-
-    console.log('Found user:', user);
-
-    // Get the latest payment for this user from the database
-    const userWithPayment = await users.findOne(
-      { 
-        email,
-        paymentStatus: 'completed'
-      },
-      { sort: { lastPaymentDate: -1 } }
-    );
-
-    if (!userWithPayment) {
-      console.log('No completed payment found for user:', email);
-      return res.status(404).json({ 
-        message: 'No completed payment found',
-        debug: { email, lastKnownStatus: user.paymentStatus }
-      });
-    }
-
-    console.log('Found payment details:', userWithPayment);
-
-    // Return the updated user data
-    const updatedUser = await users.findOne({ email }, { projection: { password: 0 } });
-    console.log('Returning updated user data:', updatedUser);
-    res.status(200).json(updatedUser);
-  } catch (error) {
-    console.error('Server Error:', error);
-    res.status(500).json({ 
-      message: 'Error updating plan status',
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-  }
-});
-
-// Webhook endpoint with detailed logging
+// Special raw body parsing for Stripe webhooks
 app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
-  console.log('Received webhook request');
-  console.log('Webhook headers:', req.headers);
-  
   const sig = req.headers['stripe-signature'];
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  console.log('Received webhook');
 
   let event;
 
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-    console.log('Webhook event constructed:', {
-      type: event.type,
-      id: event.id
-    });
+    console.log('Webhook event type:', event.type);
   } catch (err) {
-    console.error('Webhook signature verification failed:', {
-      error: err.message,
-      signature: sig,
-      body: req.body.toString()
-    });
+    console.error('Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
+  // Handle the event
   if (event.type === 'payment_intent.succeeded') {
     const paymentIntent = event.data.object;
-    console.log('Processing payment intent:', {
-      id: paymentIntent.id,
-      amount: paymentIntent.amount,
-      status: paymentIntent.status
-    });
+    console.log('Processing payment intent:', paymentIntent.id);
     
     try {
       const users = db.collection('users');
+
+      // Get the payment details
       const amount = paymentIntent.amount;
       const customerEmail = paymentIntent.receipt_email || paymentIntent.customer_email;
       
       if (!customerEmail) {
-        console.error('No customer email in payment intent:', paymentIntent.id);
+        console.error('No customer email found in payment intent');
         return res.status(400).json({ error: 'No customer email found' });
       }
 
-      console.log('Processing payment for customer:', customerEmail);
+      console.log('Customer email:', customerEmail);
 
       let selectedPlan = 'Free Plan';
       let letterCount = 0;
 
+      // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
       if (amount === 399) {
         selectedPlan = 'Basic Plan';
         letterCount = 5;
@@ -281,6 +161,7 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
 
       console.log('Updating user plan:', { selectedPlan, letterCount });
 
+      // Update user with payment details
       const updateResult = await users.updateOne(
         { email: customerEmail },
         { 
@@ -296,6 +177,7 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
 
       console.log('User update result:', updateResult);
 
+      // Send confirmation email
       const mailOptions = {
         from: process.env.EMAIL_USER,
         to: customerEmail,
@@ -310,12 +192,9 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
       };
 
       await transporter.sendMail(mailOptions);
-      console.log('Confirmation email sent to:', customerEmail);
+      console.log('Confirmation email sent');
     } catch (error) {
-      console.error('Error processing webhook:', {
-        error: error.message,
-        stack: error.stack
-      });
+      console.error('Error processing webhook:', error);
       return res.status(500).json({ error: 'Error processing webhook' });
     }
   }
@@ -323,14 +202,237 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
   res.json({received: true});
 });
 
+// Update plan status endpoint
+app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
+  console.log('Updating plan status for user:', req.user.email);
+  
+  try {
+    const { email } = req.user;
+    const users = db.collection('users');
+
+    // First, check if the user exists and get their current data
+    const user = await users.findOne({ email });
+    if (!user) {
+      console.log('User not found:', email);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    console.log('Found user:', user);
+
+    // Get the latest payment session for this user from the database
+    const userWithSession = await users.findOne(
+      { 
+        email,
+        paymentStatus: 'completed'
+      },
+      { sort: { lastPaymentDate: -1 } }
+    );
+
+    if (!userWithSession) {
+      console.log('No completed payment found for user:', email);
+      return res.status(404).json({ message: 'No completed payment found' });
+    }
+
+    console.log('Found payment session:', userWithSession);
+
+    // Return the updated user data
+    const updatedUser = await users.findOne({ email }, { projection: { password: 0 } });
+    console.log('Returning updated user data:', updatedUser);
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error('Server Error:', error);
+    res.status(500).json({ 
+      message: 'Error updating plan status',
+      details: error.message
+    });
+  }
+});
+
+// Registration endpoint
+app.post('/api/register', authLimiter, async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    const users = db.collection('users');
+
+    const existingUser = await users.findOne({ email });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'User with this email already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await users.insertOne({
+      name,
+      email,
+      password: hashedPassword,
+      createdAt: new Date(),
+      letterCount: 0,
+      selectedPlan: 'Free Plan'
+    });
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      userId: result.insertedId
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error registering user' });
+  }
+});
+
+// Login endpoint
+app.post('/api/login', authLimiter, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const users = db.collection('users');
+
+    const user = await users.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid email or password' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(400).json({ message: 'Invalid email or password' });
+    }
+
+    const token = jwt.sign({ email: user.email }, JWT_SECRET, { expiresIn: '1h' });
+    
+    res.status(200).json({
+      token,
+      user: {
+        name: user.name,
+        email: user.email,
+        selectedPlan: user.selectedPlan,
+        letterCount: user.letterCount
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error logging in' });
+  }
+});
+
+// Update user information
+app.put('/api/users/:email', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.params;
+    const updateData = req.body;
+    const users = db.collection('users');
+
+    await users.updateOne(
+      { email },
+      { $set: updateData }
+    );
+
+    res.status(200).json({ message: 'User updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating user' });
+  }
+});
+
+// Get user information
+app.get('/api/users/:email', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.params;
+    const users = db.collection('users');
+
+    const user = await users.findOne({ email }, { projection: { password: 0 } });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving user information' });
+  }
+});
+
+// Generate cover letter
+app.post('/api/generate-cover-letter', authenticateToken, async (req, res) => {
+  try {
+    const { personalData, jobAd } = req.body;
+    const users = db.collection('users');
+
+    const coverLetter = `Dear Hiring Manager,\n\nI am writing to express my interest in the position...\n\nBest regards,\n${personalData.name}`;
+
+    await users.updateOne(
+      { email: personalData.email },
+      { $inc: { letterCount: 1 } }
+    );
+
+    res.status(200).json({ coverLetter });
+  } catch (error) {
+    res.status(500).json({ message: 'Error generating cover letter' });
+  }
+});
+
+// Check authentication status
+app.get('/api/check-auth', authenticateToken, async (req, res) => {
+  try {
+    const users = db.collection('users');
+
+    const user = await users.findOne({ email: req.user.email }, { projection: { password: 0 } });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Error checking authentication status' });
+  }
+});
+
+// Stripe checkout session endpoint
+app.post('/api/create-checkout-session', authenticateToken, async (req, res) => {
+  try {
+    const { planName, planPrice } = req.body;
+
+    if (!planName || !planPrice) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    // Get the base URL from the request
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      customer_email: req.user.email,
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: planName,
+            },
+            unit_amount: planPrice,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${baseUrl}/success`,
+      cancel_url: `${baseUrl}`,
+    });
+
+    console.log('Created checkout session:', session.id);
+    res.json({ id: session.id });
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    res.status(500).json({ error: 'Error creating checkout session' });
+  }
+});
+
+// Serve static files - AFTER all API routes
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Handle client-side routing - LAST route
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
-  console.log('Environment:', {
-    NODE_ENV: process.env.NODE_ENV,
-    PORT: port,
-    CLIENT_URL: process.env.CLIENT_URL
-  });
 });
 
 // Export the app for testing
