@@ -54,10 +54,25 @@ const mergeHeaders = (headers: Record<string, string>): HeadersInit => {
 const handleResponse = async (response: Response) => {
   const contentType = response.headers.get('content-type');
   if (!response.ok) {
-    const errorData = contentType?.includes('application/json')
-      ? await response.json()
-      : { message: 'An error occurred' };
-    throw new Error(errorData.message || 'An error occurred');
+    console.error('API Error Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+      url: response.url
+    });
+    
+    let errorData;
+    try {
+      errorData = contentType?.includes('application/json') ? await response.json() : await response.text();
+      console.error('Error Response Data:', errorData);
+    } catch (e) {
+      console.error('Error parsing response:', e);
+      errorData = { message: 'Failed to parse error response' };
+    }
+    
+    throw new Error(
+      typeof errorData === 'object' ? errorData.message || JSON.stringify(errorData) : errorData || 'An error occurred'
+    );
   }
   return contentType?.includes('application/json') ? response.json() : response.text();
 };
@@ -170,23 +185,43 @@ export const resetPassword = async (token: string, newPassword: string): Promise
 // Refresh user data after updating the plan status
 export const refreshUserData = async (): Promise<PersonalData | null> => {
   try {
+    console.log('Starting refreshUserData');
     const currentUser = await checkAuth();
+    console.log('Current user from checkAuth:', currentUser);
+    
     if (!currentUser) {
+      console.log('No current user found');
       return null;
     }
 
+    const headers = getAuthHeaders();
+    console.log('Auth headers:', headers);
+
     // Update the user's plan status on the server
+    console.log('Making update-plan-status request');
     const response = await fetch(`${API_BASE_URL}/api/update-plan-status`, {
       method: 'POST',
-      headers: mergeHeaders(getAuthHeaders()),
+      headers: mergeHeaders(headers),
       body: JSON.stringify({ email: currentUser.email }),
     });
+    
+    console.log('Update plan status response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+      url: response.url
+    });
+
     await handleResponse(response);
+    console.log('Plan status updated successfully');
 
     // Get the fresh user data after plan update
-    return await getUser(currentUser.email);
+    const updatedUser = await getUser(currentUser.email);
+    console.log('Got updated user data:', updatedUser);
+    return updatedUser;
   } catch (error) {
-    console.error('Error refreshing user data:', error);
+    console.error('Error in refreshUserData:', error);
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
     return null;
   }
 };
