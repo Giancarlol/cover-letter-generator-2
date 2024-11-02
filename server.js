@@ -210,27 +210,41 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     const { email } = req.user;
     const users = db.collection('users');
 
-    // First, check if the user exists and get their current data
-    const user = await users.findOne({ email });
-    if (!user) {
-      console.log('User not found:', email);
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    console.log('Found user:', user);
-
-    // Get the latest payment session for this user from the database
-    const userWithSession = await users.findOne(
+    // Get the latest payment session for this user
+    const latestPayment = await users.findOne(
       { 
         email,
         paymentStatus: 'completed'
       },
-      { sort: { lastPaymentDate: -1 } }
+      { 
+        sort: { lastPaymentDate: -1 },
+        projection: { selectedPlan: 1, letterCount: 1, lastPaymentDate: 1 }
+      }
     );
 
-    // Return the current user data regardless of payment status
-    const userData = await users.findOne({ email }, { projection: { password: 0 } });
-    console.log('Returning user data:', userData);
+    console.log('Latest payment found:', latestPayment);
+
+    if (latestPayment) {
+      // Update the user with the latest payment information
+      await users.updateOne(
+        { email },
+        { 
+          $set: { 
+            selectedPlan: latestPayment.selectedPlan,
+            letterCount: latestPayment.letterCount,
+            lastPaymentDate: latestPayment.lastPaymentDate
+          }
+        }
+      );
+    }
+
+    // Get and return the updated user data
+    const userData = await users.findOne(
+      { email }, 
+      { projection: { password: 0 } }
+    );
+
+    console.log('Returning updated user data:', userData);
     res.status(200).json(userData);
 
   } catch (error) {
