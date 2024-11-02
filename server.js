@@ -228,17 +228,11 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
       { sort: { lastPaymentDate: -1 } }
     );
 
-    if (!userWithSession) {
-      console.log('No completed payment found for user:', email);
-      return res.status(404).json({ message: 'No completed payment found' });
-    }
+    // Return the current user data regardless of payment status
+    const userData = await users.findOne({ email }, { projection: { password: 0 } });
+    console.log('Returning user data:', userData);
+    res.status(200).json(userData);
 
-    console.log('Found payment session:', userWithSession);
-
-    // Return the updated user data
-    const updatedUser = await users.findOne({ email }, { projection: { password: 0 } });
-    console.log('Returning updated user data:', updatedUser);
-    res.status(200).json(updatedUser);
   } catch (error) {
     console.error('Server Error:', error);
     res.status(500).json({ 
