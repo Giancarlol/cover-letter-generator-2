@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PersonalData, updateUser } from '../utils/api';
 import PersonalDataPopup from './PersonalDataPopup';
 
@@ -9,18 +9,17 @@ export interface JobAdFormProps {
 const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
   const [jobAd, setJobAd] = useState('');
   const [showPopup, setShowPopup] = useState(false);
-  const [currentPersonalData, setCurrentPersonalData] = useState(personalData);
 
   const getMaxLetters = (plan: string) => {
     switch (plan) {
       case 'Free Plan':
-        return 20;
+        return 5;  // Updated to match PaymentPlanSelection
       case 'Basic Plan':
-        return 50;
+        return 20; // Updated to match PaymentPlanSelection
       case 'Premium Plan':
-        return 100;
+        return 40; // Updated to match PaymentPlanSelection
       default:
-        return 20;
+        return 5;  // Default to Free Plan limit
     }
   };
 
@@ -32,17 +31,11 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
   const handlePopupSubmit = async (data: { studies: string; experiences: string[] }) => {
     try {
       // Update the backend
-      await updateUser(currentPersonalData.email, {
+      await updateUser(personalData.email, {
         studies: data.studies,
         experiences: data.experiences
       });
 
-      // Update local state
-      setCurrentPersonalData(prev => ({
-        ...prev,
-        studies: data.studies,
-        experiences: data.experiences
-      }));
       setShowPopup(false);
     } catch (error) {
       console.error('Error updating user data:', error);
@@ -50,8 +43,8 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
     }
   };
 
-  const maxLetters = getMaxLetters(currentPersonalData?.selectedPlan || 'Free Plan');
-  const lettersLeft = maxLetters - (currentPersonalData?.letterCount || 0);
+  const maxLetters = getMaxLetters(personalData?.selectedPlan || 'Free Plan');
+  const lettersLeft = maxLetters - (personalData?.letterCount || 0);
 
   return (
     <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-lg">
@@ -59,13 +52,17 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
       
       <div className="mb-8 text-center">
         <div className="text-gray-600 mb-2">
-          Current Plan: <span className="font-semibold">{currentPersonalData?.selectedPlan || 'Free Plan'}</span>
+          Current Plan: <span className="font-semibold">{personalData?.selectedPlan || 'Free Plan'}</span>
         </div>
         <div className="text-gray-600">
-          Letters Generated: <span className="font-semibold">{currentPersonalData?.letterCount || 0}/{maxLetters}</span>
-          {lettersLeft > 0 && (
+          Letters Generated: <span className="font-semibold">{personalData?.letterCount || 0}/{maxLetters}</span>
+          {lettersLeft > 0 ? (
             <span className="ml-2 text-sm">
               ({lettersLeft} letter{lettersLeft !== 1 ? 's' : ''} remaining)
+            </span>
+          ) : (
+            <span className="ml-2 text-sm text-red-600">
+              (No letters remaining - Please upgrade your plan)
             </span>
           )}
         </div>
@@ -78,7 +75,7 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
           </label>
           <input
             type="text"
-            value={currentPersonalData?.name || ''}
+            value={personalData?.name || ''}
             disabled
             className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50"
           />
@@ -90,7 +87,7 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
           </label>
           <input
             type="text"
-            value={currentPersonalData?.studies || ''}
+            value={personalData?.studies || ''}
             disabled
             className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50"
           />
@@ -102,7 +99,7 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
           </label>
           <input
             type="text"
-            value={currentPersonalData?.experiences && currentPersonalData.experiences.length > 0 ? currentPersonalData.experiences[0] : ''}
+            value={personalData?.experiences && personalData.experiences.length > 0 ? personalData.experiences[0] : ''}
             disabled
             className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50"
           />
@@ -134,7 +131,12 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
 
         <button
           type="submit"
-          className="w-full bg-[#818cf8] hover:bg-[#6366f1] text-white font-semibold py-4 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200"
+          disabled={lettersLeft <= 0}
+          className={`w-full font-semibold py-4 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200 ${
+            lettersLeft <= 0 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-[#818cf8] hover:bg-[#6366f1] text-white'
+          }`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -148,8 +150,8 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
           onClose={() => setShowPopup(false)}
           onSubmit={handlePopupSubmit}
           initialData={{
-            studies: currentPersonalData?.studies || '',
-            experiences: currentPersonalData?.experiences || []
+            studies: personalData?.studies || '',
+            experiences: personalData?.experiences || []
           }}
         />
       )}
