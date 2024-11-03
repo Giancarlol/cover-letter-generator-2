@@ -128,24 +128,25 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Handle the event
-  if (event.type === 'payment_intent.succeeded') {
-    const paymentIntent = event.data.object;
-    console.log('Processing payment intent:', paymentIntent.id);
+  // Handle both payment_intent.succeeded and checkout.session.completed events
+  if (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed') {
+    const paymentData = event.data.object;
+    console.log('Processing payment data:', paymentData);
     
     try {
       const users = db.collection('users');
 
       // Get the payment details
-      const amount = paymentIntent.amount;
-      const customerEmail = paymentIntent.receipt_email || paymentIntent.customer_email;
+      const amount = paymentData.amount_total || paymentData.amount;
+      const customerEmail = paymentData.customer_email || paymentData.receipt_email;
       
       if (!customerEmail) {
-        console.error('No customer email found in payment intent');
+        console.error('No customer email found');
         return res.status(400).json({ error: 'No customer email found' });
       }
 
       console.log('Customer email:', customerEmail);
+      console.log('Payment amount:', amount);
 
       let selectedPlan = 'Free Plan';
       let letterCount = 0;
@@ -153,10 +154,10 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
       // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
       if (amount === 399) {
         selectedPlan = 'Basic Plan';
-        letterCount = 5;
+        letterCount = 20;
       } else if (amount === 999) {
         selectedPlan = 'Premium Plan';
-        letterCount = 15;
+        letterCount = 40;
       }
 
       console.log('Updating user plan:', { selectedPlan, letterCount });
@@ -170,7 +171,7 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
             letterCount,
             paymentStatus: 'completed',
             lastPaymentDate: new Date(),
-            stripePaymentIntentId: paymentIntent.id
+            stripePaymentId: paymentData.id
           }
         }
       );
@@ -210,42 +211,52 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     const { email } = req.user;
     const users = db.collection('users');
 
-    // Get the latest payment session for this user
-    const latestPayment = await users.findOne(
+    // Get the user's current data including payment status
+    const user = await users.findOne(
       { 
         email,
         paymentStatus: 'completed'
       },
       { 
         sort: { lastPaymentDate: -1 },
-        projection: { selectedPlan: 1, letterCount: 1, lastPaymentDate: 1 }
+        projection: { password: 0 }
       }
     );
 
-    console.log('Latest payment found:', latestPayment);
+    if (!user) {
+      console.log('No completed payment found for user:', email);
+      // Return the current user data if no payment is found
+      const currentUser = await users.findOne(
+        { email },
+        { projection: { password: 0 } }
+      );
+      return res.status(200).json(currentUser);
+    }
 
-    if (latestPayment) {
-      // Update the user with the latest payment information
+    console.log('Found user payment data:', user);
+
+    // Update the user with the payment information if it exists
+    if (user.selectedPlan && user.selectedPlan !== 'Free Plan') {
       await users.updateOne(
         { email },
         { 
           $set: { 
-            selectedPlan: latestPayment.selectedPlan,
-            letterCount: latestPayment.letterCount,
-            lastPaymentDate: latestPayment.lastPaymentDate
+            selectedPlan: user.selectedPlan,
+            letterCount: user.letterCount,
+            lastPaymentDate: user.lastPaymentDate
           }
         }
       );
     }
 
     // Get and return the updated user data
-    const userData = await users.findOne(
-      { email }, 
+    const updatedUser = await users.findOne(
+      { email },
       { projection: { password: 0 } }
     );
 
-    console.log('Returning updated user data:', userData);
-    res.status(200).json(userData);
+    console.log('Returning updated user data:', updatedUser);
+    res.status(200).json(updatedUser);
 
   } catch (error) {
     console.error('Server Error:', error);
