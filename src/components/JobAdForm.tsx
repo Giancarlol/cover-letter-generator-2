@@ -4,11 +4,17 @@ import PersonalDataPopup from './PersonalDataPopup';
 
 export interface JobAdFormProps {
   personalData: PersonalData;
+  onUpdate?: (userData: PersonalData) => void;
 }
 
-const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
+const JobAdForm: React.FC<JobAdFormProps> = ({ personalData, onUpdate }) => {
   const [jobAd, setJobAd] = useState('');
   const [showPopup, setShowPopup] = useState(false);
+
+  // Update component when personalData changes
+  useEffect(() => {
+    console.log('JobAdForm received updated personalData:', personalData);
+  }, [personalData]);
 
   const getMaxLetters = (plan: string) => {
     switch (plan) {
@@ -35,6 +41,15 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
         studies: data.studies,
         experiences: data.experiences
       });
+
+      // If onUpdate is provided, call it with the updated data
+      if (onUpdate) {
+        onUpdate({
+          ...personalData,
+          studies: data.studies,
+          experiences: data.experiences
+        });
+      }
 
       setShowPopup(false);
     } catch (error) {

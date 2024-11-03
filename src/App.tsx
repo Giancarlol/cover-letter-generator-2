@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -20,7 +20,7 @@ function App() {
   const [userData, setUserData] = useState<PersonalData | null>(null);
   const [showPaymentPlan, setShowPaymentPlan] = useState(false);
 
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     try {
       const user = await checkAuth();
       if (user) {
@@ -36,11 +36,11 @@ function App() {
       setIsAuthenticated(false);
       setUserData(null);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadUserData();
-  }, []);
+  }, [loadUserData]);
 
   const handleLogout = () => {
     clearAuthToken();
@@ -51,7 +51,6 @@ function App() {
   const handleLogin = async (user: PersonalData) => {
     setIsAuthenticated(true);
     setUserData(user);
-    // Reload user data to ensure we have the latest plan info
     await loadUserData();
   };
 
@@ -63,7 +62,6 @@ function App() {
         const loginResponse = await login(userData.email, userData.password);
         setIsAuthenticated(true);
         setUserData(loginResponse.user);
-        // Reload user data to ensure we have the latest plan info
         await loadUserData();
       }
     } catch (error) {
@@ -74,7 +72,6 @@ function App() {
   const handleSelectPlan = async (plan: string) => {
     if (userData) {
       setUserData({ ...userData, selectedPlan: plan });
-      // Reload user data to ensure we have the latest plan info
       await loadUserData();
     }
     setShowPaymentPlan(false);
@@ -83,7 +80,6 @@ function App() {
   const handleUpdateUser = async (updatedUserData: PersonalData) => {
     console.log('Updating user data:', updatedUserData);
     setUserData(updatedUserData);
-    // Reload user data to ensure we have the latest plan info
     await loadUserData();
   };
 
@@ -136,7 +132,11 @@ function App() {
               element={
                 isAuthenticated ? (
                   userData ? (
-                    <JobAdForm personalData={userData} />
+                    <JobAdForm 
+                      key={userData.selectedPlan} // Force re-render when plan changes
+                      personalData={userData}
+                      onUpdate={handleUpdateUser}
+                    />
                   ) : (
                     <PersonalDataForm onSubmit={setUserData} />
                   )
