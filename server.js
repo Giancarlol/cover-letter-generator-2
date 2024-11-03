@@ -138,7 +138,8 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
 
       // Get the payment details
       const amount = paymentData.amount_total || paymentData.amount;
-      const customerEmail = paymentData.customer_email || paymentData.receipt_email;
+      const customerEmail = paymentData.customer_email || paymentData.receipt_email || paymentData.metadata?.userEmail;
+      const planName = paymentData.metadata?.planName;
       
       if (!customerEmail) {
         console.error('No customer email found');
@@ -147,15 +148,16 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
 
       console.log('Customer email:', customerEmail);
       console.log('Payment amount:', amount);
+      console.log('Plan name from metadata:', planName);
 
-      let selectedPlan = 'Free Plan';
+      let selectedPlan = planName || 'Free Plan';
       let letterCount = 0;
 
-      // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
-      if (amount === 399) {
+      // Set plan based on payment amount or plan name
+      if (planName === 'Basic Plan' || amount === 399) {
         selectedPlan = 'Basic Plan';
         letterCount = 20;
-      } else if (amount === 999) {
+      } else if (planName === 'Premium Plan' || amount === 999) {
         selectedPlan = 'Premium Plan';
         letterCount = 40;
       }
@@ -177,6 +179,10 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
       );
 
       console.log('User update result:', updateResult);
+
+      // Get updated user data to verify the change
+      const updatedUser = await users.findOne({ email: customerEmail });
+      console.log('Updated user data:', updatedUser);
 
       // Send confirmation email
       const mailOptions = {
@@ -410,18 +416,27 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    console.log('Creating checkout session for:', { planName, planPrice, email: req.user.email });
+
     // Get the base URL from the request
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: req.user.email,
+      metadata: {
+        planName,
+        userEmail: req.user.email
+      },
       line_items: [
         {
           price_data: {
             currency: 'usd',
             product_data: {
               name: planName,
+              metadata: {
+                planType: planName
+              }
             },
             unit_amount: planPrice,
           },
