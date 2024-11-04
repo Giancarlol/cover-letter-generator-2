@@ -223,12 +223,11 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     const { email } = req.user;
     const users = db.collection('users');
 
-    // Find the most recent completed payment for non-free plans
+    // Find the most recent payment regardless of plan type
     const user = await users.findOne(
       { 
         email,
-        paymentStatus: 'completed',
-        selectedPlan: { $ne: 'Free Plan' }
+        paymentStatus: 'completed'
       },
       { 
         sort: { lastPaymentDate: -1 },
@@ -264,13 +263,25 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
       return res.status(200).json(currentUser);
     }
 
+    // Determine the plan based on the payment amount
+    let selectedPlan = user.selectedPlan;
+    let letterCount = user.letterCount;
+
+    if (user.lastPaymentAmount === 399) {
+      selectedPlan = 'Basic Plan';
+      letterCount = 20;
+    } else if (user.lastPaymentAmount === 999) {
+      selectedPlan = 'Premium Plan';
+      letterCount = 40;
+    }
+
     // Update the user with the payment information
     const updateResult = await users.updateOne(
       { email },
       { 
         $set: { 
-          selectedPlan: user.selectedPlan,
-          letterCount: user.letterCount,
+          selectedPlan,
+          letterCount,
           lastPaymentDate: user.lastPaymentDate,
           paymentStatus: 'completed'
         }
