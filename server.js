@@ -174,7 +174,8 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
             paymentStatus: 'completed',
             lastPaymentDate: new Date(),
             stripePaymentId: paymentData.id,
-            lastPaymentAmount: amountInCents
+            lastPaymentAmount: amountInCents,
+            planName: selectedPlan  // Add this to store the plan name explicitly
           }
         }
       );
@@ -223,67 +224,41 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     const { email } = req.user;
     const users = db.collection('users');
 
-    // Find the most recent payment regardless of plan type
-    const user = await users.findOne(
-      { 
-        email,
-        paymentStatus: 'completed'
-      },
-      { 
-        sort: { lastPaymentDate: -1 },
-        projection: { password: 0 }
-      }
+    // Find the user's current data
+    const currentUser = await users.findOne(
+      { email },
+      { projection: { password: 0 } }
     );
 
-    console.log('Found payment data:', user ? JSON.stringify(user, null, 2) : 'No payment found');
+    console.log('Current user data:', JSON.stringify(currentUser, null, 2));
 
-    if (!user) {
-      // If no payment found, return current user data with free plan
-      const currentUser = await users.findOne(
-        { email },
-        { projection: { password: 0 } }
-      );
-      
-      // Ensure free plan settings if no payment found
-      if (currentUser) {
-        await users.updateOne(
-          { email },
-          { 
-            $set: { 
-              selectedPlan: 'Free Plan',
-              letterCount: 0
-            }
-          }
-        );
-        currentUser.selectedPlan = 'Free Plan';
-        currentUser.letterCount = 0;
-      }
-      
-      console.log('Returning current user data:', JSON.stringify(currentUser, null, 2));
-      return res.status(200).json(currentUser);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    // Determine the plan based on the payment amount
-    let selectedPlan = user.selectedPlan;
-    let letterCount = user.letterCount;
+    // Determine the plan based on stored plan name or payment amount
+    let selectedPlan = currentUser.selectedPlan || 'Free Plan';
+    let letterCount = currentUser.letterCount || 0;
 
-    if (user.lastPaymentAmount === 399) {
+    if (currentUser.planName === 'Basic Plan' || currentUser.lastPaymentAmount === 399) {
       selectedPlan = 'Basic Plan';
       letterCount = 20;
-    } else if (user.lastPaymentAmount === 999) {
+    } else if (currentUser.planName === 'Premium Plan' || currentUser.lastPaymentAmount === 999) {
       selectedPlan = 'Premium Plan';
       letterCount = 40;
     }
 
-    // Update the user with the payment information
+    console.log(`Determined plan: ${selectedPlan}, Letters: ${letterCount}`);
+
+    // Update the user with the plan information
     const updateResult = await users.updateOne(
       { email },
       { 
         $set: { 
           selectedPlan,
           letterCount,
-          lastPaymentDate: user.lastPaymentDate,
-          paymentStatus: 'completed'
+          lastPaymentDate: currentUser.lastPaymentDate,
+          paymentStatus: currentUser.paymentStatus
         }
       }
     );
