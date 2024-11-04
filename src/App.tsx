@@ -97,7 +97,12 @@ function App() {
               {isAuthenticated && (
                 <div className="flex items-center">
                   <div className="mr-4 text-sm text-gray-600">
-                    Current Plan: {userData?.selectedPlan || 'Free Plan'}
+                    <div>Current Plan: {userData?.selectedPlan || 'Free Plan'}</div>
+                    {userData?.subscriptionEndDate && (
+                      <div className="text-xs text-gray-500">
+                        Expires: {new Date(userData.subscriptionEndDate).toLocaleDateString()}
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => setShowPaymentPlan(true)}
@@ -123,6 +128,7 @@ function App() {
               onSelectPlan={handleSelectPlan}
               onClose={() => setShowPaymentPlan(false)}
               selectedPlan={userData.selectedPlan}
+              subscriptionEndDate={userData.subscriptionEndDate}
             />
           )}
 

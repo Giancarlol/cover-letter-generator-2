@@ -11,6 +11,7 @@ const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const path = require('path');
+const cron = require('node-cron');
 
 // Initialize Stripe with the secret key
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -81,6 +82,44 @@ client.connect()
   .then(() => {
     console.log('Connected to MongoDB');
     db = client.db('coverLetterGenerator');
+    
+    // Schedule cron job to run every day at midnight
+    cron.schedule('0 0 * * *', async () => {
+      try {
+        const users = db.collection('users');
+        const subscriptions = db.collection('subscriptions');
+        
+        // Find all active subscriptions that have expired
+        const expiredSubscriptions = await subscriptions.find({
+          end_date: { $lt: new Date() },
+          status: 'active'
+        }).toArray();
+
+        // Process each expired subscription
+        for (const subscription of expiredSubscriptions) {
+          // Update subscription status
+          await subscriptions.updateOne(
+            { _id: subscription._id },
+            { $set: { status: 'expired' } }
+          );
+
+          // Downgrade user's plan to free
+          await users.updateOne(
+            { _id: subscription.user_id },
+            { 
+              $set: { 
+                selectedPlan: 'Free Plan',
+                letterCount: 0
+              }
+            }
+          );
+        }
+
+        console.log(`Processed ${expiredSubscriptions.length} expired subscriptions`);
+      } catch (error) {
+        console.error('Error in subscription cleanup cron job:', error);
+      }
+    });
   })
   .catch(err => {
     console.error('Error connecting to MongoDB:', err);
@@ -135,6 +174,7 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
     
     try {
       const users = db.collection('users');
+      const subscriptions = db.collection('subscriptions');
 
       // Get the payment details
       const amount = paymentData.amount_total || paymentData.amount;
@@ -152,17 +192,43 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
       const amountInCents = Math.round(amount);
       let selectedPlan = 'Free Plan';
       let letterCount = 0;
+      let durationWeeks = 0;
 
       // Set plan based on exact amount in cents
       if (amountInCents === 399 || planName === 'Basic Plan') {
         selectedPlan = 'Basic Plan';
         letterCount = 20;
+        durationWeeks = 2;
       } else if (amountInCents === 999 || planName === 'Premium Plan') {
         selectedPlan = 'Premium Plan';
         letterCount = 40;
+        durationWeeks = 4;
       }
 
-      console.log(`Determined plan details - Plan: ${selectedPlan}, Letters: ${letterCount}`);
+      console.log(`Determined plan details - Plan: ${selectedPlan}, Letters: ${letterCount}, Duration: ${durationWeeks} weeks`);
+
+      // Get user
+      const user = await users.findOne({ email: customerEmail });
+      if (!user) {
+        console.error(`No user found with email ${customerEmail}`);
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Calculate subscription dates
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + (durationWeeks * 7));
+
+      // Create subscription record
+      await subscriptions.insertOne({
+        user_id: user._id,
+        plan: selectedPlan,
+        start_date: startDate,
+        end_date: endDate,
+        status: 'active',
+        payment_id: paymentData.id,
+        amount: amountInCents
+      });
 
       // Update user with payment details
       const updateResult = await users.updateOne(
@@ -172,10 +238,10 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
             selectedPlan,
             letterCount,
             paymentStatus: 'completed',
-            lastPaymentDate: new Date(),
+            lastPaymentDate: startDate,
             stripePaymentId: paymentData.id,
             lastPaymentAmount: amountInCents,
-            planName: selectedPlan  // Add this to store the plan name explicitly
+            planName: selectedPlan
           }
         }
       );
@@ -201,6 +267,7 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
           <p>Your payment has been successfully processed.</p>
           <p>Plan: ${selectedPlan}</p>
           <p>Available letter generations: ${letterCount}</p>
+          <p>Subscription end date: ${endDate.toLocaleDateString()}</p>
           <p>If you have any questions, please don't hesitate to contact us.</p>
         `
       };
@@ -223,6 +290,7 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
     const users = db.collection('users');
+    const subscriptions = db.collection('subscriptions');
 
     // Find the user's current data
     const currentUser = await users.findOne(
@@ -236,34 +304,25 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Determine the plan based on stored plan name or payment amount
-    let selectedPlan = currentUser.selectedPlan || 'Free Plan';
-    let letterCount = currentUser.letterCount || 0;
+    // Check for active subscription
+    const activeSubscription = await subscriptions.findOne({
+      user_id: currentUser._id,
+      status: 'active',
+      end_date: { $gt: new Date() }
+    });
 
-    if (currentUser.planName === 'Basic Plan' || currentUser.lastPaymentAmount === 399) {
-      selectedPlan = 'Basic Plan';
-      letterCount = 20;
-    } else if (currentUser.planName === 'Premium Plan' || currentUser.lastPaymentAmount === 999) {
-      selectedPlan = 'Premium Plan';
-      letterCount = 40;
-    }
-
-    console.log(`Determined plan: ${selectedPlan}, Letters: ${letterCount}`);
-
-    // Update the user with the plan information
-    const updateResult = await users.updateOne(
-      { email },
-      { 
-        $set: { 
-          selectedPlan,
-          letterCount,
-          lastPaymentDate: currentUser.lastPaymentDate,
-          paymentStatus: currentUser.paymentStatus
+    // If no active subscription, set to free plan
+    if (!activeSubscription) {
+      await users.updateOne(
+        { email },
+        { 
+          $set: { 
+            selectedPlan: 'Free Plan',
+            letterCount: 0
+          }
         }
-      }
-    );
-
-    console.log('Update result:', JSON.stringify(updateResult, null, 2));
+      );
+    }
 
     // Get and return the updated user data
     const updatedUser = await users.findOne(

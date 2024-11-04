@@ -1,14 +1,20 @@
 import React from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, X, Clock } from 'lucide-react';
 import StripeCheckout from './StripeCheckout';
 
 interface PaymentPlanProps {
   onSelectPlan: (plan: string) => void;
   onClose: () => void;
   selectedPlan: string | null;
+  subscriptionEndDate?: string;
 }
 
-const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClose, selectedPlan }) => {
+const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ 
+  onSelectPlan, 
+  onClose, 
+  selectedPlan,
+  subscriptionEndDate 
+}) => {
   const plans = [
     { 
       name: 'Free Plan', 
@@ -19,14 +25,16 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClos
     { 
       name: 'Basic Plan', 
       price: 399, // Price in cents for Stripe
-      letters: 20, 
-      features: ['5 letters per month', 'More templates', 'Priority support'] 
+      letters: 20,
+      duration: '2 weeks',
+      features: ['20 letters per week', 'More templates', 'Priority support'] 
     },
     { 
       name: 'Premium Plan', 
       price: 999, // Price in cents for Stripe
-      letters: 40, 
-      features: ['15 letters per month', 'All templates', '24/7 support', 'Advanced customization'] 
+      letters: 40,
+      duration: '4 weeks',
+      features: ['40 letters per week', 'All templates', '24/7 support', 'Advanced customization'] 
     },
   ];
 
@@ -47,15 +55,36 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClos
         <h2 className="text-3xl font-extrabold text-gray-900 mb-6 text-center">
           Choose Your Plan
         </h2>
+        {selectedPlan && subscriptionEndDate && (
+          <div className="text-center text-gray-600 mb-4 flex items-center justify-center">
+            <Clock className="h-5 w-5 mr-2" />
+            <span>Current subscription ends on: {new Date(subscriptionEndDate).toLocaleDateString()}</span>
+          </div>
+        )}
         <p className="text-center text-gray-600 mb-8">
           Select the plan that best fits your needs
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map((plan) => (
-            <div key={plan.name} className="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
+            <div 
+              key={plan.name} 
+              className={`border rounded-lg shadow-sm divide-y divide-gray-200 ${
+                selectedPlan === plan.name ? 'border-indigo-500 ring-2 ring-indigo-500' : 'border-gray-200'
+              }`}
+            >
               <div className="p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">{plan.name}</h3>
+                <div className="flex justify-between items-start">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">{plan.name}</h3>
+                  {selectedPlan === plan.name && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                      Current Plan
+                    </span>
+                  )}
+                </div>
                 <p className="mt-4 text-sm text-gray-500">{plan.letters} letters per month</p>
+                {plan.duration && (
+                  <p className="mt-2 text-sm text-gray-500">Duration: {plan.duration}</p>
+                )}
                 <p className="mt-8">
                   <span className="text-4xl font-extrabold text-gray-900">${(plan.price / 100).toFixed(2)}</span>
                   {plan.price !== 0 && <span className="text-base font-medium text-gray-500">/mo</span>}
@@ -72,11 +101,22 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({ onSelectPlan, onClos
                     {selectedPlan === plan.name ? 'Current Plan' : `Select ${plan.name}`}
                   </button>
                 ) : (
-                  <StripeCheckout
-                    planName={plan.name}
-                    planPrice={plan.price} // Price already in cents for Stripe
-                    onError={handleError}
-                  />
+                  <div className="mt-8">
+                    {selectedPlan === plan.name && subscriptionEndDate ? (
+                      <button
+                        disabled
+                        className="w-full border border-transparent rounded-md py-2 text-sm font-semibold text-white bg-gray-400 cursor-not-allowed"
+                      >
+                        Active Subscription
+                      </button>
+                    ) : (
+                      <StripeCheckout
+                        planName={plan.name}
+                        planPrice={plan.price}
+                        onError={handleError}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
               <div className="pt-6 pb-8 px-6">

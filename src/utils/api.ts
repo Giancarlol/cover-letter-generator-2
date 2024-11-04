@@ -14,6 +14,7 @@ export interface PersonalData {
   experiences: string[];
   selectedPlan: string;
   letterCount: number;
+  subscriptionEndDate?: string;
 }
 
 export interface LoginResponse {
