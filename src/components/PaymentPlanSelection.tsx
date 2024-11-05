@@ -26,14 +26,14 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({
       name: 'Basic Plan', 
       price: 399, // Price in cents for Stripe
       letters: 20,
-      duration: '2 weeks',
+      duration: '1 week',
       features: ['20 letters per week', 'More templates', 'Priority support'] 
     },
     { 
       name: 'Premium Plan', 
       price: 999, // Price in cents for Stripe
       letters: 40,
-      duration: '4 weeks',
+      duration: '2 weeks',
       features: ['40 letters per week', 'All templates', '24/7 support', 'Advanced customization'] 
     },
   ];
@@ -43,13 +43,15 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({
     const now = new Date();
     const diffTime = end.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return diffDays > 0 ? diffDays : 0;
   };
 
   const handleError = (error: string) => {
     console.error('Stripe error:', error);
     // You might want to show this error to the user
   };
+
+  const remainingDays = subscriptionEndDate ? calculateRemainingDays(subscriptionEndDate) : 0;
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
@@ -67,8 +69,11 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({
           <div className="text-center text-gray-600 mb-4 flex items-center justify-center">
             <Clock className="h-5 w-5 mr-2" />
             <span>
-              Current subscription ends on: {new Date(subscriptionEndDate).toLocaleDateString()} 
-              ({calculateRemainingDays(subscriptionEndDate)} days remaining)
+              {remainingDays > 0 ? (
+                <span className="text-red-500 font-semibold">{remainingDays} days remaining</span>
+              ) : (
+                "Subscription expired"
+              )}
             </span>
           </div>
         )}
@@ -91,15 +96,15 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
                         Current Plan
                       </span>
-                      {subscriptionEndDate && (
-                        <span className="text-xs text-gray-500 mt-1">
-                          {calculateRemainingDays(subscriptionEndDate)} days left
+                      {subscriptionEndDate && remainingDays > 0 && (
+                        <span className="text-xs text-red-500 font-semibold mt-1">
+                          {remainingDays} days left
                         </span>
                       )}
                     </div>
                   )}
                 </div>
-                <p className="mt-4 text-sm text-gray-500">{plan.letters} letters per month</p>
+                <p className="mt-4 text-sm text-gray-500">{plan.letters} letters per week</p>
                 {plan.duration && (
                   <p className="mt-2 text-sm text-gray-500">Duration: {plan.duration}</p>
                 )}
@@ -120,7 +125,7 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({
                   </button>
                 ) : (
                   <div className="mt-8">
-                    {selectedPlan === plan.name && subscriptionEndDate ? (
+                    {selectedPlan === plan.name && subscriptionEndDate && remainingDays > 0 ? (
                       <button
                         disabled
                         className="w-full border border-transparent rounded-md py-2 text-sm font-semibold text-white bg-gray-400 cursor-not-allowed"

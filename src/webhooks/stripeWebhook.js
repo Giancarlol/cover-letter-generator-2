@@ -52,28 +52,41 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
   console.log('Processing payment for customer:', customerEmail);
 
   let selectedPlan = 'Free Plan';
-  let additionalLetters = 0;
+  let letterCount = 0;
+  let planDuration = 0; // in days
 
   if (amount === 399) {
     selectedPlan = 'Basic Plan';
-    additionalLetters = 20;  // Updated to match PaymentPlanSelection.tsx
+    letterCount = 20;
+    planDuration = 7; // 1 weeks
   } else if (amount === 999) {
     selectedPlan = 'Premium Plan';
-    additionalLetters = 40;  // Updated to match PaymentPlanSelection.tsx
+    letterCount = 40;
+    planDuration = 14; // 2 weeks
   }
 
-  console.log('Updating plan details:', { selectedPlan, additionalLetters, email: customerEmail });
+  // Calculate subscription end date
+  const subscriptionEndDate = new Date();
+  subscriptionEndDate.setDate(subscriptionEndDate.getDate() + planDuration);
+
+  console.log('Updating plan details:', { 
+    selectedPlan, 
+    letterCount, 
+    email: customerEmail,
+    subscriptionEndDate 
+  });
 
   const updateResult = await users.updateOne(
     { email: customerEmail },
     {
       $set: {
         selectedPlan,
+        letterCount, // Set directly instead of incrementing
         paymentStatus: 'completed',
         lastPaymentDate: new Date(),
+        subscriptionEndDate, // Add subscription end date
         stripePaymentIntentId: paymentIntent.id
-      },
-      $inc: { letterCount: additionalLetters }
+      }
     }
   );
 
@@ -89,9 +102,9 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
 
   // Get updated user data for email
   const updatedUser = await users.findOne({ email: customerEmail });
-  const currentLetterCount = updatedUser.letterCount || additionalLetters;
+  const currentLetterCount = updatedUser.letterCount || letterCount;
 
-  await sendConfirmationEmail(transporter, customerEmail, selectedPlan, currentLetterCount);
+  await sendConfirmationEmail(transporter, customerEmail, selectedPlan, currentLetterCount, subscriptionEndDate);
 
   return { customerEmail, selectedPlan, letterCount: currentLetterCount };
 };
@@ -121,7 +134,7 @@ const handleCheckoutSession = async (db, session, transporter) => {
   return handlePaymentSuccess(db, paymentIntent, transporter);
 };
 
-const sendConfirmationEmail = async (transporter, customerEmail, selectedPlan, letterCount) => {
+const sendConfirmationEmail = async (transporter, customerEmail, selectedPlan, letterCount, subscriptionEndDate) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: customerEmail,
@@ -131,6 +144,7 @@ const sendConfirmationEmail = async (transporter, customerEmail, selectedPlan, l
       <p>Your payment has been successfully processed.</p>
       <p>Plan: ${selectedPlan}</p>
       <p>Available letter generations: ${letterCount}</p>
+      <p>Subscription end date: ${subscriptionEndDate.toLocaleDateString()}</p>
       <p>If you have any questions, please don't hesitate to contact us.</p>
     `
   };
