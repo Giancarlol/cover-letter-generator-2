@@ -4,9 +4,10 @@ import PersonalDataPopup from './PersonalDataPopup';
 
 export interface JobAdFormProps {
   personalData: PersonalData;
+  onUpdate?: (updatedUserData: PersonalData) => Promise<void>;
 }
 
-const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
+const JobAdForm: React.FC<JobAdFormProps> = ({ personalData, onUpdate }) => {
   const [jobAd, setJobAd] = useState('');
   const [showPopup, setShowPopup] = useState(false);
   const [currentPersonalData, setCurrentPersonalData] = useState(personalData);
@@ -36,11 +37,18 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData }) => {
       });
 
       // Update local state
-      setCurrentPersonalData(prev => ({
-        ...prev,
+      const updatedData = {
+        ...currentPersonalData,
         studies: data.studies,
         experiences: data.experiences
-      }));
+      };
+      setCurrentPersonalData(updatedData);
+
+      // Notify parent component if onUpdate is provided
+      if (onUpdate) {
+        await onUpdate(updatedData);
+      }
+
       setShowPopup(false);
     } catch (error) {
       console.error('Error updating user data:', error);
