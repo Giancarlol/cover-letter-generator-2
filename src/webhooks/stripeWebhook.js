@@ -1,15 +1,34 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-const getCustomerEmail = (paymentIntent) => {
-  // Try all possible locations where email might be stored
-  const email = 
+const getCustomerEmail = async (paymentIntent) => {
+  // First try to get email from payment intent
+  let email = 
     paymentIntent.receipt_email || 
     paymentIntent.customer_details?.email ||
-    paymentIntent.metadata?.email ||
-    (paymentIntent.customer && paymentIntent.customer.email);
+    paymentIntent.metadata?.email;
+
+  // If no email found and we have a customer ID, fetch customer details
+  if (!email && paymentIntent.customer) {
+    try {
+      const customer = await stripe.customers.retrieve(paymentIntent.customer);
+      email = customer.email;
+    } catch (error) {
+      console.error('Error fetching customer:', error);
+    }
+  }
+
+  // If still no email, try to get from the associated checkout session
+  if (!email && paymentIntent.metadata?.checkout_session_id) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(paymentIntent.metadata.checkout_session_id);
+      email = session.customer_email || session.customer_details?.email;
+    } catch (error) {
+      console.error('Error fetching checkout session:', error);
+    }
+  }
 
   if (!email) {
-    throw new Error('No customer email found in payment intent');
+    throw new Error('No customer email found in payment intent or related objects');
   }
 
   return email;
@@ -25,10 +44,11 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     status: paymentIntent.status,
     customer_details: paymentIntent.customer_details,
     receipt_email: paymentIntent.receipt_email,
-    metadata: paymentIntent.metadata
+    metadata: paymentIntent.metadata,
+    customer: paymentIntent.customer
   });
 
-  const customerEmail = getCustomerEmail(paymentIntent);
+  const customerEmail = await getCustomerEmail(paymentIntent);
   console.log('Processing payment for customer:', customerEmail);
 
   let selectedPlan = 'Free Plan';
@@ -72,6 +92,31 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
   return { customerEmail, selectedPlan, letterCount };
 };
 
+const handleCheckoutSession = async (db, session, transporter) => {
+  console.log('Processing checkout session:', {
+    id: session.id,
+    customer_email: session.customer_email,
+    customer_details: session.customer_details,
+    payment_intent: session.payment_intent
+  });
+
+  if (!session.payment_intent) {
+    throw new Error('No payment intent found in checkout session');
+  }
+
+  const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
+  
+  // Add checkout session ID to payment intent metadata
+  await stripe.paymentIntents.update(paymentIntent.id, {
+    metadata: {
+      ...paymentIntent.metadata,
+      checkout_session_id: session.id
+    }
+  });
+
+  return handlePaymentSuccess(db, paymentIntent, transporter);
+};
+
 const sendConfirmationEmail = async (transporter, customerEmail, selectedPlan, letterCount) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
@@ -111,29 +156,28 @@ const handleWebhook = async (req, endpointSecret, db, transporter) => {
     const event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
     console.log('Webhook verified successfully:', event.type);
 
+    let result;
+
     switch (event.type) {
-      case 'payment_intent.succeeded':
-        const paymentIntent = event.data.object;
-        console.log('Processing payment_intent.succeeded:', paymentIntent.id);
-        const result = await handlePaymentSuccess(db, paymentIntent, transporter);
-        console.log('Payment processed successfully:', result);
-        break;
-      
       case 'checkout.session.completed':
         const session = event.data.object;
         console.log('Processing checkout.session.completed:', session.id);
-        if (session.payment_intent) {
-          const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
-          const result = await handlePaymentSuccess(db, paymentIntent, transporter);
-          console.log('Checkout session payment processed successfully:', result);
-        }
+        result = await handleCheckoutSession(db, session, transporter);
+        console.log('Checkout session processed successfully:', result);
+        break;
+
+      case 'payment_intent.succeeded':
+        const paymentIntent = event.data.object;
+        console.log('Processing payment_intent.succeeded:', paymentIntent.id);
+        result = await handlePaymentSuccess(db, paymentIntent, transporter);
+        console.log('Payment processed successfully:', result);
         break;
 
       default:
         console.log('Unhandled event type:', event.type);
     }
 
-    return { success: true };
+    return { success: true, result };
   } catch (error) {
     console.error('Webhook error:', error);
     throw error;
