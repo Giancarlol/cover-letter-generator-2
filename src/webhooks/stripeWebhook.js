@@ -1,13 +1,9 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
+// Function to get the customer's email from the payment intent or related objects
 const getCustomerEmail = async (paymentIntent) => {
-  // First try to get email from payment intent
-  let email = 
-    paymentIntent.receipt_email || 
-    paymentIntent.customer_details?.email ||
-    paymentIntent.metadata?.email;
+  let email = paymentIntent.receipt_email || paymentIntent.customer_details?.email || paymentIntent.metadata?.email;
 
-  // If no email found and we have a customer ID, fetch customer details
   if (!email && paymentIntent.customer) {
     try {
       const customer = await stripe.customers.retrieve(paymentIntent.customer);
@@ -17,7 +13,6 @@ const getCustomerEmail = async (paymentIntent) => {
     }
   }
 
-  // If still no email, try to get from the associated checkout session
   if (!email && paymentIntent.metadata?.checkout_session_id) {
     try {
       const session = await stripe.checkout.sessions.retrieve(paymentIntent.metadata.checkout_session_id);
@@ -34,10 +29,11 @@ const getCustomerEmail = async (paymentIntent) => {
   return email;
 };
 
+// Main function to handle successful payments and update user plan in the database
 const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
   const users = db.collection('users');
   const amount = paymentIntent.amount;
-  
+
   console.log('Payment intent details:', {
     id: paymentIntent.id,
     amount: paymentIntent.amount,
@@ -55,17 +51,17 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
   let letterCount = 0;
   let planDuration = 0; // in days
 
+  // Setting the plan details based on the payment amount
   if (amount === 399) {
     selectedPlan = 'Basic Plan';
-    letterCount = 20;
-    planDuration = 7; // 1 weeks
+    letterCount = 20; // Allow 20 letters for Basic Plan
+    planDuration = 7;  // Duration in days
   } else if (amount === 999) {
     selectedPlan = 'Premium Plan';
-    letterCount = 40;
-    planDuration = 14; // 2 weeks
+    letterCount = 40; // Allow 40 letters for Premium Plan
+    planDuration = 14; // Duration in days
   }
 
-  // Calculate subscription end date
   const subscriptionEndDate = new Date();
   subscriptionEndDate.setDate(subscriptionEndDate.getDate() + planDuration);
 
@@ -76,15 +72,16 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     subscriptionEndDate 
   });
 
+  // Update the user plan in the database
   const updateResult = await users.updateOne(
     { email: customerEmail },
     {
       $set: {
         selectedPlan,
-        letterCount, // Set directly instead of incrementing
+        letterCount, // Reset letter count to plan max
         paymentStatus: 'completed',
         lastPaymentDate: new Date(),
-        subscriptionEndDate, // Add subscription end date
+        subscriptionEndDate,
         stripePaymentIntentId: paymentIntent.id
       }
     }
@@ -100,15 +97,17 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     throw new Error('Failed to update user plan');
   }
 
-  // Get updated user data for email
+  // Fetch updated user data to confirm letter count
   const updatedUser = await users.findOne({ email: customerEmail });
   const currentLetterCount = updatedUser.letterCount || letterCount;
 
+  // Send confirmation email
   await sendConfirmationEmail(transporter, customerEmail, selectedPlan, currentLetterCount, subscriptionEndDate);
 
   return { customerEmail, selectedPlan, letterCount: currentLetterCount };
 };
 
+// Function to handle checkout session completion
 const handleCheckoutSession = async (db, session, transporter) => {
   console.log('Processing checkout session:', {
     id: session.id,
@@ -123,7 +122,7 @@ const handleCheckoutSession = async (db, session, transporter) => {
 
   const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
   
-  // Add checkout session ID to payment intent metadata
+  // Add checkout session ID to payment intent metadata for tracking
   await stripe.paymentIntents.update(paymentIntent.id, {
     metadata: {
       ...paymentIntent.metadata,
@@ -134,6 +133,7 @@ const handleCheckoutSession = async (db, session, transporter) => {
   return handlePaymentSuccess(db, paymentIntent, transporter);
 };
 
+// Function to send a confirmation email after successful payment
 const sendConfirmationEmail = async (transporter, customerEmail, selectedPlan, letterCount, subscriptionEndDate) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
@@ -154,10 +154,10 @@ const sendConfirmationEmail = async (transporter, customerEmail, selectedPlan, l
     console.log('Confirmation email sent to:', customerEmail);
   } catch (error) {
     console.error('Failed to send confirmation email:', error);
-    // Don't throw here - we don't want to fail the whole process if email fails
   }
 };
 
+// Main webhook handler function
 const handleWebhook = async (req, endpointSecret, db, transporter) => {
   try {
     const sig = req.headers['stripe-signature'];
