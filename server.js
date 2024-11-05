@@ -11,7 +11,6 @@ const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const path = require('path');
-const cron = require('node-cron');
 
 // Initialize Stripe with the secret key
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -82,44 +81,6 @@ client.connect()
   .then(() => {
     console.log('Connected to MongoDB');
     db = client.db('coverLetterGenerator');
-    
-    // Schedule cron job to run every day at midnight
-    cron.schedule('0 0 * * *', async () => {
-      try {
-        const users = db.collection('users');
-        const subscriptions = db.collection('subscriptions');
-        
-        // Find all active subscriptions that have expired
-        const expiredSubscriptions = await subscriptions.find({
-          end_date: { $lt: new Date() },
-          status: 'active'
-        }).toArray();
-
-        // Process each expired subscription
-        for (const subscription of expiredSubscriptions) {
-          // Update subscription status
-          await subscriptions.updateOne(
-            { _id: subscription._id },
-            { $set: { status: 'expired' } }
-          );
-
-          // Downgrade user's plan to free
-          await users.updateOne(
-            { _id: subscription.user_id },
-            { 
-              $set: { 
-                selectedPlan: 'Free Plan',
-                letterCount: 0
-              }
-            }
-          );
-        }
-
-        console.log(`Processed ${expiredSubscriptions.length} expired subscriptions`);
-      } catch (error) {
-        console.error('Error in subscription cleanup cron job:', error);
-      }
-    });
   })
   .catch(err => {
     console.error('Error connecting to MongoDB:', err);
@@ -154,133 +115,110 @@ const authenticateToken = (req, res, next) => {
 
 // Special raw body parsing for Stripe webhooks
 app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  console.log('Received webhook');
-
   let event;
-
+  
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-    console.log('Webhook event type:', event.type);
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  // Handle both payment_intent.succeeded and checkout.session.completed events
-  if (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed') {
-    const paymentData = event.data.object;
-    console.log('Processing payment data:', JSON.stringify(paymentData, null, 2));
+    const sig = req.headers['stripe-signature'];
     
-    try {
-      const users = db.collection('users');
-      const subscriptions = db.collection('subscriptions');
-
-      // Get the payment details
-      const amount = paymentData.amount_total || paymentData.amount;
-      const customerEmail = paymentData.customer_email || paymentData.receipt_email || paymentData.metadata?.userEmail;
-      const planName = paymentData.metadata?.planName;
-      
-      if (!customerEmail) {
-        console.error('No customer email found in payment data:', paymentData);
-        return res.status(400).json({ error: 'No customer email found' });
-      }
-
-      console.log(`Processing payment for ${customerEmail} - Amount: ${amount}, Plan: ${planName}`);
-
-      // Normalize amount to cents for comparison
-      const amountInCents = Math.round(amount);
-      let selectedPlan = 'Free Plan';
-      let letterCount = 0;
-      let durationWeeks = 0;
-
-      // Set plan based on exact amount in cents
-      if (amountInCents === 399 || planName === 'Basic Plan') {
-        selectedPlan = 'Basic Plan';
-        letterCount = 20;
-        durationWeeks = 2;
-      } else if (amountInCents === 999 || planName === 'Premium Plan') {
-        selectedPlan = 'Premium Plan';
-        letterCount = 40;
-        durationWeeks = 4;
-      }
-
-      console.log(`Determined plan details - Plan: ${selectedPlan}, Letters: ${letterCount}, Duration: ${durationWeeks} weeks`);
-
-      // Get user
-      const user = await users.findOne({ email: customerEmail });
-      if (!user) {
-        console.error(`No user found with email ${customerEmail}`);
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // Calculate subscription dates
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + (durationWeeks * 7));
-
-      // Create subscription record
-      await subscriptions.insertOne({
-        user_id: user._id,
-        plan: selectedPlan,
-        start_date: startDate,
-        end_date: endDate,
-        status: 'active',
-        payment_id: paymentData.id,
-        amount: amountInCents
-      });
-
-      // Update user with payment details
-      const updateResult = await users.updateOne(
-        { email: customerEmail },
-        { 
-          $set: { 
-            selectedPlan,
-            letterCount,
-            paymentStatus: 'completed',
-            lastPaymentDate: startDate,
-            stripePaymentId: paymentData.id,
-            lastPaymentAmount: amountInCents,
-            planName: selectedPlan
-          }
-        }
-      );
-
-      if (!updateResult.matchedCount) {
-        console.error(`No user found with email ${customerEmail}`);
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      console.log(`User update successful - Modified: ${updateResult.modifiedCount}`);
-
-      // Get updated user data to verify the change
-      const updatedUser = await users.findOne({ email: customerEmail });
-      console.log('Updated user data:', JSON.stringify(updatedUser, null, 2));
-
-      // Send confirmation email
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: customerEmail,
-        subject: 'Payment Confirmation - Cover Letter Generator',
-        html: `
-          <h1>Thank you for your purchase!</h1>
-          <p>Your payment has been successfully processed.</p>
-          <p>Plan: ${selectedPlan}</p>
-          <p>Available letter generations: ${letterCount}</p>
-          <p>Subscription end date: ${endDate.toLocaleDateString()}</p>
-          <p>If you have any questions, please don't hesitate to contact us.</p>
-        `
-      };
-
-      await transporter.sendMail(mailOptions);
-      console.log('Confirmation email sent successfully');
-    } catch (error) {
-      console.error('Error processing webhook:', error);
-      return res.status(500).json({ error: 'Error processing webhook', details: error.message });
+    if (!sig) {
+      console.error('No Stripe signature found');
+      return res.status(400).send('No Stripe signature found');
     }
-  }
 
-  res.json({received: true});
+    if (!endpointSecret) {
+      console.error('No endpoint secret found');
+      return res.status(500).send('Webhook secret is not configured');
+    }
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+      console.log('Webhook verified successfully');
+    } catch (err) {
+      console.error(`Webhook signature verification failed: ${err.message}`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object;
+      console.log('Processing payment intent:', paymentIntent.id);
+      
+      try {
+        const users = db.collection('users');
+
+        // Get the payment details
+        const amount = paymentIntent.amount;
+        const customerEmail = paymentIntent.receipt_email || paymentIntent.customer_details?.email;
+        
+        if (!customerEmail) {
+          console.error('No customer email found in payment intent');
+          return res.status(400).json({ error: 'No customer email found' });
+        }
+
+        console.log('Customer email:', customerEmail);
+
+        let selectedPlan = 'Free Plan';
+        let letterCount = 0;
+
+        // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
+        if (amount === 399) {
+          selectedPlan = 'Basic Plan';
+          letterCount = 5;
+        } else if (amount === 999) {
+          selectedPlan = 'Premium Plan';
+          letterCount = 15;
+        }
+
+        console.log('Updating user plan:', { selectedPlan, letterCount });
+
+        // Update user with payment details
+        const updateResult = await users.updateOne(
+          { email: customerEmail },
+          { 
+            $set: { 
+              selectedPlan,
+              letterCount,
+              paymentStatus: 'completed',
+              lastPaymentDate: new Date(),
+              stripePaymentIntentId: paymentIntent.id
+            }
+          }
+        );
+
+        console.log('User update result:', updateResult);
+
+        // Send confirmation email
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: customerEmail,
+          subject: 'Payment Confirmation - Cover Letter Generator',
+          html: `
+            <h1>Thank you for your purchase!</h1>
+            <p>Your payment has been successfully processed.</p>
+            <p>Plan: ${selectedPlan}</p>
+            <p>Available letter generations: ${letterCount}</p>
+            <p>If you have any questions, please don't hesitate to contact us.</p>
+          `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log('Confirmation email sent');
+        
+        // Send success response
+        res.json({ received: true });
+      } catch (error) {
+        console.error('Error processing webhook:', error);
+        return res.status(500).json({ error: 'Error processing webhook' });
+      }
+    } else {
+      // For other event types, acknowledge receipt
+      console.log('Unhandled event type:', event.type);
+      res.json({ received: true });
+    }
+  } catch (err) {
+    console.error('Error processing webhook:', err);
+    res.status(400).send(`Webhook Error: ${err.message}`);
+  }
 });
 
 // Update plan status endpoint
@@ -290,48 +228,43 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
     const users = db.collection('users');
-    const subscriptions = db.collection('subscriptions');
 
-    // Find the user's current data
-    const currentUser = await users.findOne(
-      { email },
-      { projection: { password: 0 } }
+    // Get the latest payment session for this user
+    const latestPayment = await users.findOne(
+      { 
+        email,
+        paymentStatus: 'completed'
+      },
+      { 
+        sort: { lastPaymentDate: -1 },
+        projection: { selectedPlan: 1, letterCount: 1, lastPaymentDate: 1 }
+      }
     );
 
-    console.log('Current user data:', JSON.stringify(currentUser, null, 2));
+    console.log('Latest payment found:', latestPayment);
 
-    if (!currentUser) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Check for active subscription
-    const activeSubscription = await subscriptions.findOne({
-      user_id: currentUser._id,
-      status: 'active',
-      end_date: { $gt: new Date() }
-    });
-
-    // If no active subscription, set to free plan
-    if (!activeSubscription) {
+    if (latestPayment) {
+      // Update the user with the latest payment information
       await users.updateOne(
         { email },
         { 
           $set: { 
-            selectedPlan: 'Free Plan',
-            letterCount: 0
+            selectedPlan: latestPayment.selectedPlan,
+            letterCount: latestPayment.letterCount,
+            lastPaymentDate: latestPayment.lastPaymentDate
           }
         }
       );
     }
 
     // Get and return the updated user data
-    const updatedUser = await users.findOne(
-      { email },
+    const userData = await users.findOne(
+      { email }, 
       { projection: { password: 0 } }
     );
 
-    console.log('Returning updated user data:', JSON.stringify(updatedUser, null, 2));
-    res.status(200).json(updatedUser);
+    console.log('Returning updated user data:', userData);
+    res.status(200).json(userData);
 
   } catch (error) {
     console.error('Server Error:', error);
@@ -485,27 +418,18 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    console.log('Creating checkout session for:', { planName, planPrice, email: req.user.email });
-
     // Get the base URL from the request
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: req.user.email,
-      metadata: {
-        planName,
-        userEmail: req.user.email
-      },
       line_items: [
         {
           price_data: {
             currency: 'usd',
             product_data: {
               name: planName,
-              metadata: {
-                planType: planName
-              }
             },
             unit_amount: planPrice,
           },
