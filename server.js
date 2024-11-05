@@ -2,22 +2,20 @@
 require('dotenv').config();
 
 const express = require('express');
-const { MongoClient, ObjectId } = require('mongodb');
+const { MongoClient } = require('mongodb');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { OpenAI } = require('openai');
 const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
-const crypto = require('crypto');
 const path = require('path');
+const { handleWebhook } = require('./src/webhooks/stripeWebhook');
 
 // Initialize Stripe with the secret key
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
-
-// Trust proxy - MUST be set before any other middleware
 app.set('trust proxy', 1);
 
 const port = process.env.PORT || 3001;
@@ -41,16 +39,16 @@ app.use((req, res, next) => {
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100
 });
 
 app.use(limiter);
 
 // Additional rate limits for sensitive endpoints
 const authLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5 // limit each IP to 5 requests per windowMs
+  windowMs: 60 * 60 * 1000,
+  max: 5
 });
 
 // Email transporter setup
@@ -64,7 +62,6 @@ const transporter = nodemailer.createTransport({
 
 // MongoDB connection
 const uri = process.env.MONGODB_URI;
-
 if (!uri) {
   console.error('Error: MONGODB_URI is not defined in your environment variables.');
   process.exit(1);
@@ -87,10 +84,7 @@ client.connect()
     process.exit(1);
   });
 
-// This is your Stripe CLI webhook secret for testing your endpoint locally.
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-// JWT configuration
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // Authentication middleware
@@ -111,113 +105,17 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// API Routes
-
 // Special raw body parsing for Stripe webhooks
 app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
-  let event;
-  
   try {
-    const sig = req.headers['stripe-signature'];
-    
-    if (!sig) {
-      console.error('No Stripe signature found');
-      return res.status(400).send('No Stripe signature found');
-    }
-
-    if (!endpointSecret) {
-      console.error('No endpoint secret found');
-      return res.status(500).send('Webhook secret is not configured');
-    }
-
-    try {
-      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-      console.log('Webhook verified successfully');
-    } catch (err) {
-      console.error(`Webhook signature verification failed: ${err.message}`);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    // Handle the event
-    if (event.type === 'payment_intent.succeeded') {
-      const paymentIntent = event.data.object;
-      console.log('Processing payment intent:', paymentIntent.id);
-      
-      try {
-        const users = db.collection('users');
-
-        // Get the payment details
-        const amount = paymentIntent.amount;
-        const customerEmail = paymentIntent.receipt_email || paymentIntent.customer_details?.email;
-        
-        if (!customerEmail) {
-          console.error('No customer email found in payment intent');
-          return res.status(400).json({ error: 'No customer email found' });
-        }
-
-        console.log('Customer email:', customerEmail);
-
-        let selectedPlan = 'Free Plan';
-        let letterCount = 0;
-
-        // Set plan based on payment amount (399 = $3.99, 999 = $9.99)
-        if (amount === 399) {
-          selectedPlan = 'Basic Plan';
-          letterCount = 5;
-        } else if (amount === 999) {
-          selectedPlan = 'Premium Plan';
-          letterCount = 15;
-        }
-
-        console.log('Updating user plan:', { selectedPlan, letterCount });
-
-        // Update user with payment details
-        const updateResult = await users.updateOne(
-          { email: customerEmail },
-          { 
-            $set: { 
-              selectedPlan,
-              letterCount,
-              paymentStatus: 'completed',
-              lastPaymentDate: new Date(),
-              stripePaymentIntentId: paymentIntent.id
-            }
-          }
-        );
-
-        console.log('User update result:', updateResult);
-
-        // Send confirmation email
-        const mailOptions = {
-          from: process.env.EMAIL_USER,
-          to: customerEmail,
-          subject: 'Payment Confirmation - Cover Letter Generator',
-          html: `
-            <h1>Thank you for your purchase!</h1>
-            <p>Your payment has been successfully processed.</p>
-            <p>Plan: ${selectedPlan}</p>
-            <p>Available letter generations: ${letterCount}</p>
-            <p>If you have any questions, please don't hesitate to contact us.</p>
-          `
-        };
-
-        await transporter.sendMail(mailOptions);
-        console.log('Confirmation email sent');
-        
-        // Send success response
-        res.json({ received: true });
-      } catch (error) {
-        console.error('Error processing webhook:', error);
-        return res.status(500).json({ error: 'Error processing webhook' });
-      }
-    } else {
-      // For other event types, acknowledge receipt
-      console.log('Unhandled event type:', event.type);
-      res.json({ received: true });
-    }
-  } catch (err) {
-    console.error('Error processing webhook:', err);
-    res.status(400).send(`Webhook Error: ${err.message}`);
+    await handleWebhook(req, endpointSecret, db, transporter);
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(400).json({ 
+      error: error.message || 'Webhook Error',
+      details: error.stack
+    });
   }
 });
 
@@ -229,7 +127,6 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     const { email } = req.user;
     const users = db.collection('users');
 
-    // Get the latest payment session for this user
     const latestPayment = await users.findOne(
       { 
         email,
@@ -244,7 +141,6 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     console.log('Latest payment found:', latestPayment);
 
     if (latestPayment) {
-      // Update the user with the latest payment information
       await users.updateOne(
         { email },
         { 
@@ -257,7 +153,6 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
       );
     }
 
-    // Get and return the updated user data
     const userData = await users.findOne(
       { email }, 
       { projection: { password: 0 } }
@@ -282,13 +177,11 @@ app.post('/api/register', authLimiter, async (req, res) => {
     const users = db.collection('users');
 
     const existingUser = await users.findOne({ email });
-
     if (existingUser) {
       return res.status(400).json({ message: 'User with this email already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const result = await users.insertOne({
       name,
       email,
@@ -418,7 +311,6 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    // Get the base URL from the request
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
     const session = await stripe.checkout.sessions.create({
@@ -449,10 +341,10 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
   }
 });
 
-// Serve static files - AFTER all API routes
+// Serve static files
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Handle client-side routing - LAST route
+// Handle client-side routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
@@ -462,5 +354,4 @@ app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
-// Export the app for testing
 module.exports = app;
