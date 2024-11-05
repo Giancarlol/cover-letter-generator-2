@@ -147,7 +147,6 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     res.status(200).json(userData);
 
   } catch (error) {
-    console.error('Server Error:', error);
     res.status(500).json({ 
       message: 'Error updating plan status',
       details: error.message
@@ -293,15 +292,33 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
+    // Create a customer first
+    const customer = await stripe.customers.create({
+      email: req.user.email,
+      metadata: {
+        planName,
+        planPrice: planPrice.toString()
+      }
+    });
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
+      customer: customer.id,
       customer_email: req.user.email,
+      metadata: {
+        customerEmail: req.user.email,
+        planName,
+        planPrice: planPrice.toString()
+      },
       line_items: [
         {
           price_data: {
             currency: 'usd',
             product_data: {
               name: planName,
+              metadata: {
+                customerEmail: req.user.email
+              }
             },
             unit_amount: planPrice,
           },
