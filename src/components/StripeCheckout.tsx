@@ -12,12 +12,12 @@ interface StripeCheckoutProps {
 
 const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, onError }) => {
   useEffect(() => {
-    // Log for debugging (remove in production)
-    console.log('Component mounted with:', {
-      hasStripeKey: !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
-      planName,
-      planPrice
-    });
+    // Store plan details in sessionStorage for verification
+    sessionStorage.setItem('pendingPlan', JSON.stringify({
+      name: planName,
+      price: planPrice,
+      timestamp: new Date().toISOString()
+    }));
   }, [planName, planPrice]);
 
   const handleCheckout = async () => {
@@ -33,8 +33,11 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
         throw new Error('Authentication required');
       }
 
-      console.log('Making request to create checkout session');
-      console.log('Request payload:', { planName, planPrice });
+      console.log('Initiating checkout for:', {
+        planName,
+        planPrice,
+        timestamp: new Date().toISOString()
+      });
 
       // Use the full URL instead of relative path
       const response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
@@ -49,11 +52,15 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
         }),
       });
 
-      console.log('Response status:', response.status);
+      console.log('Checkout session response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
       
       if (!response.ok) {
         const text = await response.text();
-        console.error('Error response:', text);
+        console.error('Checkout session error:', text);
         try {
           const errorData = JSON.parse(text);
           throw new Error(errorData.error || 'Failed to create checkout session');
@@ -63,21 +70,31 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
       }
 
       const data = await response.json();
-      console.log('Session created:', data);
+      console.log('Checkout session created:', {
+        sessionId: data.id,
+        timestamp: new Date().toISOString()
+      });
 
       if (!data.id) {
         throw new Error('Invalid session data received');
       }
+
+      // Store the session ID for verification
+      sessionStorage.setItem('checkoutSessionId', data.id);
 
       const result = await stripe.redirectToCheckout({
         sessionId: data.id,
       });
 
       if (result.error) {
+        console.error('Stripe redirect error:', result.error);
         throw new Error(result.error.message || 'An error occurred during checkout');
       }
     } catch (error) {
       console.error('Stripe checkout error:', error);
+      // Clear stored data on error
+      sessionStorage.removeItem('pendingPlan');
+      sessionStorage.removeItem('checkoutSessionId');
       onError(error instanceof Error ? error.message : 'An error occurred during checkout');
     }
   };

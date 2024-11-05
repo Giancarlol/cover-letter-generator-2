@@ -11,13 +11,22 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
-  const MAX_ATTEMPTS = 5;
-  const RETRY_DELAY = 3000; // 3 seconds
+  const MAX_ATTEMPTS = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
 
   useEffect(() => {
     const verifyPaymentAndUpdate = async () => {
       try {
-        console.log(`Attempt ${attempts + 1} of ${MAX_ATTEMPTS} to verify payment...`);
+        // Get stored checkout information
+        const pendingPlanStr = sessionStorage.getItem('pendingPlan');
+        const sessionId = sessionStorage.getItem('checkoutSessionId');
+        const pendingPlan = pendingPlanStr ? JSON.parse(pendingPlanStr) : null;
+
+        console.log(`Attempt ${attempts + 1} of ${MAX_ATTEMPTS} to verify payment...`, {
+          pendingPlan,
+          sessionId,
+          timestamp: new Date().toISOString()
+        });
         
         // Get current user data
         const userData = await refreshUserData();
@@ -27,29 +36,63 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
           throw new Error('Failed to fetch user data');
         }
 
-        // If the user is still on Free Plan after payment, something went wrong
-        if (userData.selectedPlan === 'Free Plan' && attempts < MAX_ATTEMPTS - 1) {
-          console.log('Plan not yet updated, will retry...');
-          setAttempts(prev => prev + 1);
-          return; // Will trigger another attempt due to useEffect dependency
-        }
-
-        // If we got here and still on Free Plan, payment processing failed
-        if (userData.selectedPlan === 'Free Plan') {
-          throw new Error('Payment processing failed. Please contact support.');
-        }
-        
-        // Payment processed successfully
-        console.log('Payment verified successfully:', userData);
+        // Always update the UI with latest user data
         if (onUpdateUser) {
+          console.log('Updating user data in parent component');
           await onUpdateUser(userData);
         }
-        
+
+        // If we've made all attempts and plan isn't updated, show a warning
+        if (userData.selectedPlan === 'Free Plan' && attempts >= MAX_ATTEMPTS - 1) {
+          const errorDetails = {
+            pendingPlan,
+            sessionId,
+            currentPlan: userData.selectedPlan,
+            attempts,
+            timestamp: new Date().toISOString()
+          };
+          console.log('Payment verification incomplete:', errorDetails);
+          
+          setError(`Your payment is being processed. If your plan is not updated within 24 hours, please contact support with reference: ${sessionId}`);
+          
+          // Clean up stored data
+          sessionStorage.removeItem('pendingPlan');
+          sessionStorage.removeItem('checkoutSessionId');
+          
+          // Navigate after delay
+          setTimeout(() => navigate('/'), 5000);
+          return;
+        }
+
+        // If plan is still free and we have more attempts, retry
+        if (userData.selectedPlan === 'Free Plan' && attempts < MAX_ATTEMPTS - 1) {
+          console.log('Plan not yet updated, will retry...', {
+            currentPlan: userData.selectedPlan,
+            attempt: attempts + 1,
+            timestamp: new Date().toISOString()
+          });
+          setAttempts(prev => prev + 1);
+          return;
+        }
+
+        // Success - plan was updated or we're out of attempts
+        console.log('Payment verification complete:', {
+          finalPlan: userData.selectedPlan,
+          attempts,
+          timestamp: new Date().toISOString()
+        });
+
+        // Clean up stored data
+        sessionStorage.removeItem('pendingPlan');
+        sessionStorage.removeItem('checkoutSessionId');
+
+        // Navigate home
         navigate('/');
+        
       } catch (error) {
         console.error('Error verifying payment:', error);
-        setError(error instanceof Error ? error.message : 'Failed to verify payment status');
-        // Still navigate after a delay if we hit an error
+        setError('There was an issue verifying your payment. Your plan will be updated automatically when the payment is processed.');
+        // Still navigate after a delay
         setTimeout(() => navigate('/'), 5000);
       }
     };
@@ -57,19 +100,22 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
     // Start verification after initial delay
     const timer = setTimeout(verifyPaymentAndUpdate, RETRY_DELAY);
     return () => clearTimeout(timer);
-  }, [navigate, onUpdateUser, attempts]); // Include attempts in dependencies
+  }, [navigate, onUpdateUser, attempts]);
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
       <div className="bg-white rounded-lg shadow-xl p-8 m-4 max-w-sm w-full">
         {error ? (
           <>
-            <h2 className="text-2xl font-bold mb-4 text-center text-red-600">
-              Payment Error
+            <h2 className="text-2xl font-bold mb-4 text-center text-yellow-600">
+              Payment Processing
             </h2>
-            <p className="text-red-600 text-center mb-4">
+            <p className="text-gray-600 text-center mb-4">
               {error}
             </p>
+            <div className="mt-4 text-sm text-gray-500 text-center">
+              Reference ID: {sessionStorage.getItem('checkoutSessionId') || 'Not available'}
+            </div>
           </>
         ) : attempts < MAX_ATTEMPTS ? (
           <>
@@ -79,14 +125,17 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
             <p className="text-gray-600 text-center">
               Please wait while we verify your payment...
             </p>
+            <div className="mt-4 flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
           </>
         ) : (
           <>
             <h2 className="text-2xl font-bold mb-4 text-center text-green-600">
-              Payment Received!
+              Payment Received
             </h2>
             <p className="text-gray-600 text-center">
-              Your plan has been updated. You will be redirected shortly...
+              Your payment has been received. Your plan will be updated shortly.
             </p>
           </>
         )}
