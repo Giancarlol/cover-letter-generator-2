@@ -126,19 +126,37 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
 app.post('/api/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     const { planName, planPrice } = req.body;
+    const userEmail = req.user.email;
 
     if (!planName || !planPrice) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    // First, try to find an existing customer or create a new one
+    let customer;
+    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
+    
+    if (customers.data.length > 0) {
+      customer = customers.data[0];
+    } else {
+      customer = await stripe.customers.create({
+        email: userEmail,
+        metadata: {
+          planName,
+          planPrice: planPrice.toString()
+        }
+      });
+    }
+
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
     const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
       payment_method_types: ['card'],
-      customer_email: req.user.email,
       metadata: {
         planName,
-        planPrice: planPrice.toString()
+        planPrice: planPrice.toString(),
+        userEmail: userEmail
       },
       line_items: [
         {
@@ -157,7 +175,12 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       cancel_url: `${baseUrl}`,
     });
 
-    console.log('Created checkout session:', session.id);
+    console.log('Created checkout session:', {
+      sessionId: session.id,
+      customerId: customer.id,
+      userEmail: userEmail
+    });
+    
     res.json({ id: session.id });
   } catch (error) {
     console.error('Error creating checkout session:', error);
