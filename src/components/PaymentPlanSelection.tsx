@@ -38,6 +38,14 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({
     },
   ];
 
+  const calculateRemainingDays = (endDate: string) => {
+    const end = new Date(endDate);
+    const now = new Date();
+    const diffTime = end.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
   const handleError = (error: string) => {
     console.error('Stripe error:', error);
     // You might want to show this error to the user
@@ -58,7 +66,10 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({
         {selectedPlan && subscriptionEndDate && (
           <div className="text-center text-gray-600 mb-4 flex items-center justify-center">
             <Clock className="h-5 w-5 mr-2" />
-            <span>Current subscription ends on: {new Date(subscriptionEndDate).toLocaleDateString()}</span>
+            <span>
+              Current subscription ends on: {new Date(subscriptionEndDate).toLocaleDateString()} 
+              ({calculateRemainingDays(subscriptionEndDate)} days remaining)
+            </span>
           </div>
         )}
         <p className="text-center text-gray-600 mb-8">
@@ -76,9 +87,16 @@ const PaymentPlanSelection: React.FC<PaymentPlanProps> = ({
                 <div className="flex justify-between items-start">
                   <h3 className="text-lg leading-6 font-medium text-gray-900">{plan.name}</h3>
                   {selectedPlan === plan.name && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                      Current Plan
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                        Current Plan
+                      </span>
+                      {subscriptionEndDate && (
+                        <span className="text-xs text-gray-500 mt-1">
+                          {calculateRemainingDays(subscriptionEndDate)} days left
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
                 <p className="mt-4 text-sm text-gray-500">{plan.letters} letters per month</p>

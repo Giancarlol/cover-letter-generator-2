@@ -52,28 +52,28 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
   console.log('Processing payment for customer:', customerEmail);
 
   let selectedPlan = 'Free Plan';
-  let letterCount = 0;
+  let additionalLetters = 0;
 
   if (amount === 399) {
     selectedPlan = 'Basic Plan';
-    letterCount = 5;
+    additionalLetters = 20;  // Updated to match PaymentPlanSelection.tsx
   } else if (amount === 999) {
     selectedPlan = 'Premium Plan';
-    letterCount = 15;
+    additionalLetters = 40;  // Updated to match PaymentPlanSelection.tsx
   }
 
-  console.log('Updating plan details:', { selectedPlan, letterCount, email: customerEmail });
+  console.log('Updating plan details:', { selectedPlan, additionalLetters, email: customerEmail });
 
   const updateResult = await users.updateOne(
     { email: customerEmail },
     {
       $set: {
         selectedPlan,
-        letterCount,
         paymentStatus: 'completed',
         lastPaymentDate: new Date(),
         stripePaymentIntentId: paymentIntent.id
-      }
+      },
+      $inc: { letterCount: additionalLetters }
     }
   );
 
@@ -87,9 +87,13 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     throw new Error('Failed to update user plan');
   }
 
-  await sendConfirmationEmail(transporter, customerEmail, selectedPlan, letterCount);
+  // Get updated user data for email
+  const updatedUser = await users.findOne({ email: customerEmail });
+  const currentLetterCount = updatedUser.letterCount || additionalLetters;
 
-  return { customerEmail, selectedPlan, letterCount };
+  await sendConfirmationEmail(transporter, customerEmail, selectedPlan, currentLetterCount);
+
+  return { customerEmail, selectedPlan, letterCount: currentLetterCount };
 };
 
 const handleCheckoutSession = async (db, session, transporter) => {
