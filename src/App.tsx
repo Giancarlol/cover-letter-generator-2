@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import Login from './components/Login';
@@ -92,33 +92,44 @@ function App() {
             <div className="flex justify-between h-16">
               <div className="flex">
                 <div className="flex-shrink-0 flex items-center">
-                  <h1 className="text-xl font-bold text-gray-900">Cover Letter Generator</h1>
+                  <Link to="/" className="text-xl font-bold text-gray-900">
+                    Cover Letter Generator
+                  </Link>
                 </div>
               </div>
-              {isAuthenticated && (
-                <div className="flex items-center">
-                  <div className="mr-4 text-sm text-gray-600">
-                    <div>Current Plan: {userData?.selectedPlan || 'Free Plan'}</div>
-                    {userData?.subscriptionEndDate && (
-                      <div className="text-xs text-gray-500">
-                        Expires: {new Date(userData.subscriptionEndDate).toLocaleDateString()}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setShowPaymentPlan(true)}
-                    className="mr-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    Plans
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center">
+                {/* Updated FAQs link to use React Router Link */}
+                <Link
+                  to="/faqs"
+                  className="mr-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                >
+                  FAQs
+                </Link>
+                {isAuthenticated && (
+                  <>
+                    <div className="mr-4 text-sm text-gray-600">
+                      <div>Current Plan: {userData?.selectedPlan || 'Free Plan'}</div>
+                      {userData?.subscriptionEndDate && (
+                        <div className="text-xs text-gray-500">
+                          Expires: {new Date(userData.subscriptionEndDate).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setShowPaymentPlan(true)}
+                      className="mr-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      Plans
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                    >
+                      Logout
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </nav>
@@ -181,10 +192,9 @@ function App() {
               } 
             />
             <Route path="/reset-password" element={<ResetPassword />} />
+            {/* FAQs route accessible to all users */}
+            <Route path="/faqs" element={<FAQs />} />
           </Routes>
-
-          {/* Add FAQs component */}
-          {!isAuthenticated && <FAQs />}
         </main>
       </div>
     </Elements>
