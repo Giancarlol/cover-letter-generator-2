@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PersonalData, updateUser } from '../utils/api';
+import { PersonalData, updateUser, generateCoverLetter } from '../utils/api';
 import PersonalDataPopup from './PersonalDataPopup';
 
 export interface JobAdFormProps {
@@ -12,6 +12,9 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData, onUpdate }) => {
   const { t } = useTranslation();
   const [jobAd, setJobAd] = useState('');
   const [showPopup, setShowPopup] = useState(false);
+  const [generatedLetter, setGeneratedLetter] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('JobAdForm received updated personalData:', personalData);
@@ -30,9 +33,35 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData, onUpdate }) => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle job ad submission
+    if (!jobAd.trim()) {
+      setError(t('errors.jobAdRequired'));
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+    setGeneratedLetter(null);
+
+    try {
+      const letter = await generateCoverLetter(personalData, jobAd);
+      setGeneratedLetter(letter);
+      
+      // Update the user data to reflect the new letter count
+      if (onUpdate) {
+        const updatedPersonalData = {
+          ...personalData,
+          letterCount: personalData.letterCount - 1
+        };
+        onUpdate(updatedPersonalData);
+      }
+    } catch (error) {
+      console.error('Error generating cover letter:', error);
+      setError(error instanceof Error ? error.message : t('errors.generateFailed'));
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handlePopupSubmit = async (data: { studies: string; experiences: string[] }) => {
@@ -143,21 +172,46 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData, onUpdate }) => {
           />
         </div>
 
+        {error && (
+          <div className="text-red-600 text-sm">
+            {error}
+          </div>
+        )}
+
         <button
           type="submit"
-          disabled={lettersLeft <= 0}
+          disabled={lettersLeft <= 0 || isGenerating}
           className={`w-full font-semibold py-4 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200 ${
-            lettersLeft <= 0 
+            lettersLeft <= 0 || isGenerating
               ? 'bg-gray-400 cursor-not-allowed' 
               : 'bg-[#818cf8] hover:bg-[#6366f1] text-white'
           }`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-          {t('forms.generateCoverLetter')}
+          {isGenerating ? (
+            <>
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {t('forms.generating')}
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+              {t('forms.generateCoverLetter')}
+            </>
+          )}
         </button>
       </form>
+
+      {generatedLetter && (
+        <div className="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
+          <h2 className="text-xl font-semibold mb-4">{t('forms.generatedLetter')}</h2>
+          <div className="whitespace-pre-wrap">{generatedLetter}</div>
+        </div>
+      )}
 
       {showPopup && (
         <PersonalDataPopup
