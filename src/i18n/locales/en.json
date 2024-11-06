@@ -17,7 +17,30 @@
     "personalData": "Personal Data",
     "submit": "Submit",
     "cancel": "Cancel",
-    "save": "Save"
+    "save": "Save",
+    "yourName": "Your Name",
+    "yourStudies": "Your Studies",
+    "yourExperience": "Your Experience",
+    "editStudiesExperience": "Edit Studies & Experience",
+    "generateCoverLetter": "Generate Cover Letter",
+    "jobAdPlaceholder": "Paste the job advertisement here...",
+    "noLettersRemaining": "No letters remaining - Please upgrade your plan",
+    "lettersRemaining": "{{count}} letter remaining",
+    "lettersRemaining_plural": "{{count}} letters remaining",
+    "currentPlanLabel": "Current Plan",
+    "lettersRemainingLabel": "Letters Remaining"
+  },
+  "personalDataPopup": {
+    "title": "Personal Data",
+    "studies": "Studies",
+    "experiences": "Experiences (one per line)",
+    "studiesPlaceholder": "Enter your educational background",
+    "experiencesPlaceholder": "Enter your work experiences, one per line",
+    "save": "Save",
+    "errors": {
+      "studiesRequired": "Studies information is required",
+      "experiencesRequired": "At least one experience is required"
+    }
   },
   "plans": {
     "freePlan": "Free Plan",

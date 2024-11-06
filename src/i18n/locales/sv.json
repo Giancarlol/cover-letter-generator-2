@@ -17,7 +17,18 @@
     "personalData": "Personuppgifter",
     "submit": "Skicka",
     "cancel": "Avbryt",
-    "save": "Spara"
+    "save": "Spara",
+    "yourName": "Ditt Namn",
+    "yourStudies": "Dina Studier",
+    "yourExperience": "Din Erfarenhet",
+    "editStudiesExperience": "Redigera Studier och Erfarenhet",
+    "generateCoverLetter": "Generera Personligt Brev",
+    "jobAdPlaceholder": "Klistra in jobbannonsen här...",
+    "noLettersRemaining": "Inga brev kvar - Vänligen uppgradera din plan",
+    "lettersRemaining": "{{count}} brev kvar",
+    "lettersRemaining_plural": "{{count}} brev kvar",
+    "currentPlanLabel": "Nuvarande Plan",
+    "lettersRemainingLabel": "Återstående Brev"
   },
   "plans": {
     "freePlan": "Gratisplan",

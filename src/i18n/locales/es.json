@@ -17,7 +17,18 @@
     "personalData": "Datos Personales",
     "submit": "Enviar",
     "cancel": "Cancelar",
-    "save": "Guardar"
+    "save": "Guardar",
+    "yourName": "Tu Nombre",
+    "yourStudies": "Tus Estudios",
+    "yourExperience": "Tu Experiencia",
+    "editStudiesExperience": "Editar Estudios y Experiencia",
+    "generateCoverLetter": "Generar Carta de Presentación",
+    "jobAdPlaceholder": "Pega aquí el anuncio de trabajo...",
+    "noLettersRemaining": "No quedan cartas - Por favor actualiza tu plan",
+    "lettersRemaining": "{{count}} carta restante",
+    "lettersRemaining_plural": "{{count}} cartas restantes",
+    "currentPlanLabel": "Plan Actual",
+    "lettersRemainingLabel": "Cartas Restantes"
   },
   "plans": {
     "freePlan": "Plan Gratuito",
