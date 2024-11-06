@@ -91,6 +91,19 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 // JWT configuration
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// Helper function to get letter count based on plan
+const getLetterCountForPlan = (plan) => {
+  switch (plan) {
+    case 'Basic Plan':
+      return 20;
+    case 'Premium Plan':
+      return 40;
+    case 'Free Plan':
+    default:
+      return 5;
+  }
+};
+
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -201,14 +214,16 @@ app.post('/api/register', authLimiter, async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const selectedPlan = 'Free Plan';
+    const letterCount = getLetterCountForPlan(selectedPlan); // Set initial letter count based on Free Plan
 
     const result = await users.insertOne({
       name,
       email,
       password: hashedPassword,
       createdAt: new Date(),
-      letterCount: 0,
-      selectedPlan: 'Free Plan'
+      letterCount,
+      selectedPlan
     });
 
     res.status(201).json({
@@ -301,7 +316,7 @@ app.post('/api/generate-cover-letter', authenticateToken, async (req, res) => {
 
     const coverLetter = `Dear Hiring Manager,\n\nI am writing to express my interest in the position...\n\nBest regards,\n${personalData.name}`;
 
-    // Decrement the letter count instead of incrementing
+    // Decrement the letter count
     await users.updateOne(
       { email: personalData.email },
       { $inc: { letterCount: -1 } }
