@@ -1,0 +1,33 @@
+{
+  "navigation": {
+    "coverLetterGenerator": "Generador de Carta de Presentación",
+    "faqs": "Preguntas Frecuentes",
+    "plans": "Planes",
+    "logout": "Cerrar Sesión",
+    "currentPlan": "Plan Actual",
+    "expires": "Vence"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "register": "Registrarse",
+    "resetPassword": "Restablecer Contraseña"
+  },
+  "forms": {
+    "jobAd": "Anuncio de Trabajo",
+    "personalData": "Datos Personales",
+    "submit": "Enviar",
+    "cancel": "Cancelar",
+    "save": "Guardar"
+  },
+  "plans": {
+    "freePlan": "Plan Gratuito",
+    "basicPlan": "Plan Básico",
+    "premiumPlan": "Plan Premium",
+    "selectPlan": "Seleccionar Plan"
+  },
+  "payment": {
+    "success": "Pago Exitoso",
+    "failed": "Pago Fallido",
+    "tryAgain": "Intentar de Nuevo"
+  }
+}

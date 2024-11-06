@@ -1,0 +1,33 @@
+{
+  "navigation": {
+    "coverLetterGenerator": "Cover Letter Generator",
+    "faqs": "FAQs",
+    "plans": "Plans",
+    "logout": "Logout",
+    "currentPlan": "Current Plan",
+    "expires": "Expires"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "resetPassword": "Reset Password"
+  },
+  "forms": {
+    "jobAd": "Job Advertisement",
+    "personalData": "Personal Data",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
+  "plans": {
+    "freePlan": "Free Plan",
+    "basicPlan": "Basic Plan",
+    "premiumPlan": "Premium Plan",
+    "selectPlan": "Select Plan"
+  },
+  "payment": {
+    "success": "Payment Successful",
+    "failed": "Payment Failed",
+    "tryAgain": "Try Again"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "navigation": {
+    "coverLetterGenerator": "Personligt Brev Generator",
+    "faqs": "Vanliga Frågor",
+    "plans": "Abonnemang",
+    "logout": "Logga ut",
+    "currentPlan": "Nuvarande Plan",
+    "expires": "Går ut"
+  },
+  "auth": {
+    "login": "Logga in",
+    "register": "Registrera",
+    "resetPassword": "Återställ Lösenord"
+  },
+  "forms": {
+    "jobAd": "Jobbannonser",
+    "personalData": "Personuppgifter",
+    "submit": "Skicka",
+    "cancel": "Avbryt",
+    "save": "Spara"
+  },
+  "plans": {
+    "freePlan": "Gratisplan",
+    "basicPlan": "Basplan",
+    "premiumPlan": "Premiumplan",
+    "selectPlan": "Välj Plan"
+  },
+  "payment": {
+    "success": "Betalning Lyckades",
+    "failed": "Betalning Misslyckades",
+    "tryAgain": "Försök Igen"
+  }
+}

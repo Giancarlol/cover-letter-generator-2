@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
+import { useTranslation } from 'react-i18next';
+import './i18n/config';
 import Login from './components/Login';
 import RegistrationForm from './components/RegistrationForm';
 import JobAdForm from './components/JobAdForm';
@@ -17,6 +19,7 @@ import type { PersonalData, RegistrationData } from './utils/api';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 function App() {
+  const { t, i18n } = useTranslation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userData, setUserData] = useState<PersonalData | null>(null);
   const [showPaymentPlan, setShowPaymentPlan] = useState(false);
@@ -84,6 +87,10 @@ function App() {
     await loadUserData();
   };
 
+  const changeLanguage = (language: string) => {
+    i18n.changeLanguage(language);
+  };
+
   return (
     <Elements stripe={stripePromise}>
       <div className="min-h-screen bg-gray-100">
@@ -93,25 +100,35 @@ function App() {
               <div className="flex">
                 <div className="flex-shrink-0 flex items-center">
                   <Link to="/" className="text-xl font-bold text-gray-900">
-                    Cover Letter Generator
+                    {t('navigation.coverLetterGenerator')}
                   </Link>
                 </div>
               </div>
               <div className="flex items-center">
-                {/* Updated FAQs link to use React Router Link */}
+                {/* Language Selector */}
+                <select
+                  onChange={(e) => changeLanguage(e.target.value)}
+                  value={i18n.language}
+                  className="mr-4 px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                  <option value="sv">Svenska</option>
+                </select>
+
                 <Link
                   to="/faqs"
                   className="mr-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
                 >
-                  FAQs
+                  {t('navigation.faqs')}
                 </Link>
                 {isAuthenticated && (
                   <>
                     <div className="mr-4 text-sm text-gray-600">
-                      <div>Current Plan: {userData?.selectedPlan || 'Free Plan'}</div>
+                      <div>{t('navigation.currentPlan')}: {userData?.selectedPlan || t('plans.freePlan')}</div>
                       {userData?.subscriptionEndDate && (
                         <div className="text-xs text-gray-500">
-                          Expires: {new Date(userData.subscriptionEndDate).toLocaleDateString()}
+                          {t('navigation.expires')}: {new Date(userData.subscriptionEndDate).toLocaleDateString()}
                         </div>
                       )}
                     </div>
@@ -119,13 +136,13 @@ function App() {
                       onClick={() => setShowPaymentPlan(true)}
                       className="mr-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
                     >
-                      Plans
+                      {t('navigation.plans')}
                     </button>
                     <button
                       onClick={handleLogout}
                       className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
                     >
-                      Logout
+                      {t('navigation.logout')}
                     </button>
                   </>
                 )}
@@ -151,7 +168,7 @@ function App() {
                 isAuthenticated ? (
                   userData ? (
                     <JobAdForm 
-                      key={userData.selectedPlan} // Force re-render when plan changes
+                      key={userData.selectedPlan}
                       personalData={userData}
                       onUpdate={handleUpdateUser}
                     />
@@ -192,7 +209,6 @@ function App() {
               } 
             />
             <Route path="/reset-password" element={<ResetPassword />} />
-            {/* FAQs route accessible to all users */}
             <Route path="/faqs" element={<FAQs />} />
           </Routes>
         </main>
