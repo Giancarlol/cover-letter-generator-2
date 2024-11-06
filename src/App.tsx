@@ -9,6 +9,7 @@ import PersonalDataForm from './components/PersonalDataForm';
 import PaymentPlanSelection from './components/PaymentPlanSelection';
 import PaymentSuccess from './components/PaymentSuccess';
 import ResetPassword from './components/ResetPassword';
+import FAQs from './components/FAQs';
 import { checkAuth, clearAuthToken, registerUser, login } from './utils/api';
 import type { PersonalData, RegistrationData } from './utils/api';
 
@@ -181,6 +182,9 @@ function App() {
             />
             <Route path="/reset-password" element={<ResetPassword />} />
           </Routes>
+
+          {/* Add FAQs component */}
+          {!isAuthenticated && <FAQs />}
         </main>
       </div>
     </Elements>
