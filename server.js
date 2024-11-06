@@ -7,6 +7,7 @@ const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { OpenAI } = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
@@ -15,6 +16,13 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { handleWebhook } = require('./src/webhooks/stripeWebhook');
 
 const app = express();
+
+// Initialize AI models
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Trust proxy - MUST be set before any other middleware
 app.set('trust proxy', 1);
@@ -103,6 +111,66 @@ const getLetterCountForPlan = (plan) => {
       return 5;
   }
 };
+
+// Helper function to generate cover letter using OpenAI
+async function generateWithOpenAI(personalData, jobAd) {
+  const prompt = `You are an expert cover letter writer with extensive experience in professional recruitment and HR. Your task is to create a compelling, tailored cover letter that highlights the candidate's most relevant qualifications, skills, and accomplishments for this specific job, in the same language as the job advertisement:
+  "${jobAd}"
+  
+  Using the following personal information:
+  Name: ${personalData.name}
+  Studies: ${personalData.studies}
+  Experience: ${personalData.experiences.join(', ')}
+  
+  Guidelines:
+
+Write in a professional yet engaging tone.
+Emphasize the candidate's relevant skills and experiences that directly match the job requirements.
+Show genuine enthusiasm and a clear understanding of the role and company.
+Keep the letter concise, impactful, and focused on value-add.
+Avoid clichés, generic statements, and overly formal language.
+Where possible, include specific achievements, metrics, or examples.
+Use proper business letter format.
+Adapt the tone and style to reflect the company culture, as inferred from the job posting and company values.
+Ensure the language matches that of the job advertisement.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.7,
+  });
+
+  return completion.choices[0].message.content;
+}
+
+// Helper function to generate cover letter using Gemini
+async function generateWithGemini(personalData, jobAd) {
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+  
+  const prompt = `You are an expert cover letter writer with extensive experience in professional recruitment and HR. Your task is to create a compelling, tailored cover letter that highlights the candidate's most relevant qualifications, skills, and accomplishments for this specific job, using the same language as the job advertisement:
+  "${jobAd}"
+  
+  Using the following personal information:
+  Name: ${personalData.name}
+  Studies: ${personalData.studies}
+  Experience: ${personalData.experiences.join(', ')}
+  
+  Guidelines:
+
+Write in a professional yet engaging tone.
+Emphasize the candidate's relevant skills and experiences that directly match the job requirements.
+Demonstrate genuine enthusiasm and a clear understanding of the role and company.
+Keep the letter concise, impactful, and focused on the candidate’s unique value-add.
+Avoid clichés, generic statements, and overly formal language.
+Where possible, include specific achievements, metrics, or examples to illustrate the candidate’s impact.
+Use proper business letter format.
+Adapt the tone and style to reflect the company culture, as inferred from the job posting and company values.
+Ensure the letter is written in the same language as the job advertisement`;
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  return response.text();
+}
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -314,7 +382,14 @@ app.post('/api/generate-cover-letter', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'No letters remaining. Please upgrade your plan.' });
     }
 
-    const coverLetter = `Dear Hiring Manager,\n\nI am writing to express my interest in the position...\n\nBest regards,\n${personalData.name}`;
+    let coverLetter;
+    // Use different AI models based on the user's plan
+    if (user.selectedPlan === 'Free Plan') {
+      coverLetter = await generateWithGemini(personalData, jobAd);
+    } else {
+      // Basic and Premium plans use OpenAI
+      coverLetter = await generateWithOpenAI(personalData, jobAd);
+    }
 
     // Decrement the letter count
     await users.updateOne(
@@ -324,7 +399,8 @@ app.post('/api/generate-cover-letter', authenticateToken, async (req, res) => {
 
     res.status(200).json({ coverLetter });
   } catch (error) {
-    res.status(500).json({ message: 'Error generating cover letter' });
+    console.error('Error generating cover letter:', error);
+    res.status(500).json({ message: 'Error generating cover letter', error: error.message });
   }
 });
 
