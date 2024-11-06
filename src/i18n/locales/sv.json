@@ -30,6 +30,18 @@
     "currentPlanLabel": "Nuvarande Plan",
     "lettersRemainingLabel": "Återstående Brev"
   },
+  "personalDataPopup": {
+    "title": "Personuppgifter",
+    "studies": "Studier",
+    "experiences": "Erfarenheter (en per rad)",
+    "studiesPlaceholder": "Ange din utbildningsbakgrund",
+    "experiencesPlaceholder": "Ange dina arbetserfarenheter, en per rad",
+    "save": "Spara",
+    "errors": {
+      "studiesRequired": "Information om studier krävs",
+      "experiencesRequired": "Minst en erfarenhet krävs"
+    }
+  },
   "plans": {
     "freePlan": "Gratisplan",
     "basicPlan": "Basplan",

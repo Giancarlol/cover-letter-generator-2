@@ -30,6 +30,18 @@
     "currentPlanLabel": "Plan Actual",
     "lettersRemainingLabel": "Cartas Restantes"
   },
+  "personalDataPopup": {
+    "title": "Datos Personales",
+    "studies": "Estudios",
+    "experiences": "Experiencias (una por línea)",
+    "studiesPlaceholder": "Ingresa tu formación académica",
+    "experiencesPlaceholder": "Ingresa tus experiencias laborales, una por línea",
+    "save": "Guardar",
+    "errors": {
+      "studiesRequired": "La información de estudios es requerida",
+      "experiencesRequired": "Se requiere al menos una experiencia"
+    }
+  },
   "plans": {
     "freePlan": "Plan Gratuito",
     "basicPlan": "Plan Básico",
