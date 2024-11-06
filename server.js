@@ -293,11 +293,18 @@ app.post('/api/generate-cover-letter', authenticateToken, async (req, res) => {
     const { personalData, jobAd } = req.body;
     const users = db.collection('users');
 
+    // First check if user has any letters remaining
+    const user = await users.findOne({ email: personalData.email });
+    if (!user || user.letterCount <= 0) {
+      return res.status(400).json({ message: 'No letters remaining. Please upgrade your plan.' });
+    }
+
     const coverLetter = `Dear Hiring Manager,\n\nI am writing to express my interest in the position...\n\nBest regards,\n${personalData.name}`;
 
+    // Decrement the letter count instead of incrementing
     await users.updateOne(
       { email: personalData.email },
-      { $inc: { letterCount: 1 } }
+      { $inc: { letterCount: -1 } }
     );
 
     res.status(200).json({ coverLetter });
