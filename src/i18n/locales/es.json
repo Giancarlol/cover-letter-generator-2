@@ -23,6 +23,8 @@
     "yourExperience": "Tu Experiencia",
     "editStudiesExperience": "Editar Estudios y Experiencia",
     "generateCoverLetter": "Generar Carta de Presentación",
+    "generating": "Generando carta...",
+    "generatedLetter": "Tu Generada Carta de Presentación ",
     "jobAdPlaceholder": "Pega aquí el anuncio de trabajo...",
     "noLettersRemaining": "No quedan cartas - Por favor actualiza tu plan",
     "lettersRemaining": "{{count}} carta restante",

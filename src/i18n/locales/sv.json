@@ -23,6 +23,8 @@
     "yourExperience": "Din Erfarenhet",
     "editStudiesExperience": "Redigera Studier och Erfarenhet",
     "generateCoverLetter": "Generera Personligt Brev",
+    "generating": "Genererar brev...",
+    "generatedLetter": "Ditt Genererade Personliga Brev",
     "jobAdPlaceholder": "Klistra in jobbannonsen här...",
     "noLettersRemaining": "Inga brev kvar - Vänligen uppgradera din plan",
     "lettersRemaining": "{{count}} brev kvar",

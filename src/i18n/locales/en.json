@@ -23,6 +23,8 @@
     "yourExperience": "Your Experience",
     "editStudiesExperience": "Edit Studies & Experience",
     "generateCoverLetter": "Generate Cover Letter",
+    "generating": "Generating letter...",
+    "generatedLetter": "Your Generated Cover Letter",
     "jobAdPlaceholder": "Paste the job advertisement here...",
     "noLettersRemaining": "No letters remaining - Please upgrade your plan",
     "lettersRemaining": "{{count}} letter remaining",
