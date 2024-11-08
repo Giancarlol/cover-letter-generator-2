@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
           style-src 'self' 'unsafe-inline';
           img-src 'self' data: blob: https:;
           font-src 'self';
-          connect-src 'self' http://localhost:* ws://localhost:* https://*.stripe.com;
+          connect-src 'self' http://localhost:* ws://localhost:* https://*.stripe.com https://tailoredlettersai.com;
           frame-src 'self' https://*.stripe.com;
         `.replace(/\s+/g, ' ').trim()
       }

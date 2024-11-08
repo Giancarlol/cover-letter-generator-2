@@ -31,7 +31,7 @@ const port = process.env.PORT || 3001;
 
 // CORS configuration
 app.use(cors({
-  origin: [process.env.CLIENT_URL, 'https://tailored-letters-app-49dff41a7b95.herokuapp.com'],
+  origin: process.env.CLIENT_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -160,9 +160,9 @@ async function generateWithGemini(personalData, jobAd) {
 Write in a professional yet engaging tone.
 Emphasize the candidate's relevant skills and experiences that directly match the job requirements.
 Demonstrate genuine enthusiasm and a clear understanding of the role and company.
-Keep the letter concise, impactful, and focused on the candidate’s unique value-add.
+Keep the letter concise, impactful, and focused on the candidate's unique value-add.
 Avoid clichés, generic statements, and overly formal language.
-Where possible, include specific achievements, metrics, or examples to illustrate the candidate’s impact.
+Where possible, include specific achievements, metrics, or examples to illustrate the candidate's impact.
 Use proper business letter format.
 Adapt the tone and style to reflect the company culture, as inferred from the job posting and company values.
 Ensure the letter is written in the same language as the job advertisement`;
@@ -229,7 +229,7 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       });
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = process.env.CLIENT_URL;
 
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
