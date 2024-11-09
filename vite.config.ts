@@ -30,8 +30,12 @@ export default defineConfig(({ mode }) => {
       }
     },
     define: {
-      'process.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY),
-      'process.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL)
+      // Explicitly stringify all environment variables
+      'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || ''),
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL || ''),
+      // Add a flag to check if we're in production
+      'import.meta.env.PROD': mode === 'production',
+      'import.meta.env.DEV': mode === 'development'
     },
     build: {
       rollupOptions: {

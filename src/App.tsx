@@ -15,8 +15,15 @@ import FAQs from './components/FAQs';
 import { checkAuth, clearAuthToken, registerUser, login } from './utils/api';
 import type { PersonalData, RegistrationData } from './utils/api';
 
+// Debug log for Stripe key
+console.log('Environment:', import.meta.env.MODE);
+console.log('Stripe Key Available:', !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
+  console.error('Stripe publishable key is missing!');
+}
+
 // Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 function App() {
   const { t, i18n } = useTranslation();

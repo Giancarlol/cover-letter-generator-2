@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
+import { useStripe } from '@stripe/react-stripe-js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 interface StripeCheckoutProps {
   planName: string;
@@ -11,6 +10,8 @@ interface StripeCheckoutProps {
 }
 
 const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, onError }) => {
+  const stripe = useStripe();
+
   useEffect(() => {
     // Store plan details in sessionStorage for verification
     sessionStorage.setItem('pendingPlan', JSON.stringify({
@@ -22,7 +23,6 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
 
   const handleCheckout = async () => {
     try {
-      const stripe = await stripePromise;
       if (!stripe) {
         throw new Error('Failed to initialize Stripe');
       }
