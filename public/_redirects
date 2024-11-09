@@ -1,0 +1,2 @@
+/api/*  https://tailored-letters-app-49dff41a7b95.herokuapp.com/api/:splat  200
+/*    /index.html   200

@@ -31,7 +31,7 @@ const port = process.env.PORT || 3001;
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+  origin: ['https://tailoredlettersai.com', 'https://www.tailoredlettersai.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -472,14 +472,6 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
       details: error.message
     });
   }
-});
-
-// Serve static files - AFTER all API routes
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// Handle client-side routing - LAST route
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 // Start the server
