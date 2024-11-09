@@ -1,5 +1,14 @@
+declare global {
+  interface Window {
+    env: {
+      VITE_STRIPE_PUBLISHABLE_KEY: string;
+      VITE_API_BASE_URL: string;
+    };
+  }
+}
+
 // Default to production URL if environment variable is not set
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://tailoredlettersai.com';
+const API_BASE_URL = window.env?.VITE_API_BASE_URL || 'https://tailoredlettersai.com';
 
 export interface RegistrationData {
   name: string;

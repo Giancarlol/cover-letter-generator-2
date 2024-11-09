@@ -1,7 +1,16 @@
 import React, { useEffect } from 'react';
 import { useStripe } from '@stripe/react-stripe-js';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+declare global {
+  interface Window {
+    env: {
+      VITE_STRIPE_PUBLISHABLE_KEY: string;
+      VITE_API_BASE_URL: string;
+    };
+  }
+}
+
+const API_BASE_URL = window.env?.VITE_API_BASE_URL || 'http://localhost:3001';
 
 interface StripeCheckoutProps {
   planName: string;

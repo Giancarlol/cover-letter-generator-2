@@ -15,15 +15,24 @@ import FAQs from './components/FAQs';
 import { checkAuth, clearAuthToken, registerUser, login } from './utils/api';
 import type { PersonalData, RegistrationData } from './utils/api';
 
+declare global {
+  interface Window {
+    env: {
+      VITE_STRIPE_PUBLISHABLE_KEY: string;
+      VITE_API_BASE_URL: string;
+    };
+  }
+}
+
 // Debug log for Stripe key
 console.log('Environment:', import.meta.env.MODE);
-console.log('Stripe Key Available:', !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
+console.log('Window Stripe Key:', window.env?.VITE_STRIPE_PUBLISHABLE_KEY);
+if (!window.env?.VITE_STRIPE_PUBLISHABLE_KEY) {
   console.error('Stripe publishable key is missing!');
 }
 
-// Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+// Initialize Stripe with window.env
+const stripePromise = loadStripe(window.env?.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 function App() {
   const { t, i18n } = useTranslation();
