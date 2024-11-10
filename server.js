@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const path = require('path');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { handleWebhook } = require('./src/webhooks/stripeWebhook');
+const franc = require('franc');
 
 const app = express();
 
@@ -23,6 +24,14 @@ const openai = new OpenAI({
 });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Language mapping for more readable names
+const languageNames = {
+  eng: 'English',
+  spa: 'Spanish',
+  swe: 'Swedish',
+  // Add more languages as needed
+};
 
 // Trust proxy - MUST be set before any other middleware
 app.set('trust proxy', 1);
@@ -114,25 +123,32 @@ const getLetterCountForPlan = (plan) => {
 
 // Helper function to generate cover letter using OpenAI
 async function generateWithOpenAI(personalData, jobAd) {
-  const prompt = `You are an expert cover letter writer with extensive experience in professional recruitment and HR. Your task is to create a compelling, tailored cover letter that highlights the candidate's most relevant qualifications, skills, and accomplishments for this specific job, in the same language as the job advertisement:
-  "${jobAd}"
-  
-  Using the following personal information:
-  Name: ${personalData.name}
-  Studies: ${personalData.studies}
-  Experience: ${personalData.experiences.join(', ')}
-  
-  Guidelines:
+  // Detect the language of the job advertisement
+  const detectedLangCode = franc(jobAd);
+  const detectedLanguage = languageNames[detectedLangCode] || 'English'; // Default to English if detection fails
 
-Write in a professional yet engaging tone.
-Emphasize the candidate's relevant skills and experiences that directly match the job requirements.
-Show genuine enthusiasm and a clear understanding of the role and company.
-Keep the letter concise, impactful, and focused on value-add.
-Avoid clichés, generic statements, and overly formal language.
-Where possible, include specific achievements, metrics, or examples.
-Use proper business letter format.
-Adapt the tone and style to reflect the company culture, as inferred from the job posting and company values.
-Ensure the language matches that of the job advertisement.`;
+  const prompt = `You are an expert cover letter writer with extensive experience in professional recruitment and HR. Your task is to create a compelling, tailored cover letter that highlights the candidate's most relevant qualifications, skills, and accomplishments for this specific job.
+
+The job advertisement is written in ${detectedLanguage}, so you MUST write the cover letter in ${detectedLanguage} as well.
+
+Job Advertisement:
+"${jobAd}"
+  
+Personal Information:
+Name: ${personalData.name}
+Studies: ${personalData.studies}
+Experience: ${personalData.experiences.join(', ')}
+  
+Guidelines:
+- Write the entire cover letter in ${detectedLanguage}
+- Write in a professional yet engaging tone
+- Emphasize the candidate's relevant skills and experiences that directly match the job requirements
+- Show genuine enthusiasm and a clear understanding of the role and company
+- Keep the letter concise, impactful, and focused on value-add
+- Avoid clichés, generic statements, and overly formal language
+- Where possible, include specific achievements, metrics, or examples
+- Use proper business letter format
+- Adapt the tone and style to reflect the company culture, as inferred from the job posting`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
@@ -147,25 +163,32 @@ Ensure the language matches that of the job advertisement.`;
 async function generateWithGemini(personalData, jobAd) {
   const model = genAI.getGenerativeModel({ model: "gemini-pro" });
   
-  const prompt = `You are an expert cover letter writer with extensive experience in professional recruitment and HR. Your task is to create a compelling, tailored cover letter that highlights the candidate's most relevant qualifications, skills, and accomplishments for this specific job, using the same language as the job advertisement:
-  "${jobAd}"
+  // Detect the language of the job advertisement
+  const detectedLangCode = franc(jobAd);
+  const detectedLanguage = languageNames[detectedLangCode] || 'English'; // Default to English if detection fails
   
-  Using the following personal information:
-  Name: ${personalData.name}
-  Studies: ${personalData.studies}
-  Experience: ${personalData.experiences.join(', ')}
-  
-  Guidelines:
+  const prompt = `You are an expert cover letter writer with extensive experience in professional recruitment and HR. Your task is to create a compelling, tailored cover letter that highlights the candidate's most relevant qualifications, skills, and accomplishments for this specific job.
 
-Write in a professional yet engaging tone.
-Emphasize the candidate's relevant skills and experiences that directly match the job requirements.
-Demonstrate genuine enthusiasm and a clear understanding of the role and company.
-Keep the letter concise, impactful, and focused on the candidate's unique value-add.
-Avoid clichés, generic statements, and overly formal language.
-Where possible, include specific achievements, metrics, or examples to illustrate the candidate's impact.
-Use proper business letter format.
-Adapt the tone and style to reflect the company culture, as inferred from the job posting and company values.
-Ensure the letter is written in the same language as the job advertisement`;
+The job advertisement is written in ${detectedLanguage}, so you MUST write the cover letter in ${detectedLanguage} as well.
+
+Job Advertisement:
+"${jobAd}"
+  
+Personal Information:
+Name: ${personalData.name}
+Studies: ${personalData.studies}
+Experience: ${personalData.experiences.join(', ')}
+  
+Guidelines:
+- Write the entire cover letter in ${detectedLanguage}
+- Write in a professional yet engaging tone
+- Emphasize the candidate's relevant skills and experiences that directly match the job requirements
+- Show genuine enthusiasm and a clear understanding of the role and company
+- Keep the letter concise, impactful, and focused on value-add
+- Avoid clichés, generic statements, and overly formal language
+- Where possible, include specific achievements, metrics, or examples
+- Use proper business letter format
+- Adapt the tone and style to reflect the company culture, as inferred from the job posting`;
 
   const result = await model.generateContent(prompt);
   const response = await result.response;
