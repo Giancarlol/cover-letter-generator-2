@@ -5,7 +5,8 @@
     "plans": "Abonnemang",
     "logout": "Logga ut",
     "currentPlan": "Nuvarande Plan",
-    "expires": "Går ut"
+    "expires": "Går ut",
+    "contact": "Kontakta oss"
   },
   "auth": {
     "login": "Logga in",

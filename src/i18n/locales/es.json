@@ -5,7 +5,8 @@
     "plans": "Planes",
     "logout": "Cerrar Sesión",
     "currentPlan": "Plan Actual",
-    "expires": "Vence"
+    "expires": "Vence",
+    "contact": "Contáctanos"
   },
   "auth": {
     "login": "Iniciar Sesión",

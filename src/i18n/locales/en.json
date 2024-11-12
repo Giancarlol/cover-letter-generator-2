@@ -5,7 +5,8 @@
     "plans": "Plans",
     "logout": "Logout",
     "currentPlan": "Current Plan",
-    "expires": "Expires"
+    "expires": "Expires",
+    "contact": "Contact us"
   },
   "auth": {
     "login": "Login",
