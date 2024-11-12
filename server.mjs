@@ -75,6 +75,12 @@ const authLimiter = rateLimit({
   max: 5 // limit each IP to 5 requests per windowMs
 });
 
+// Contact form rate limiter
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3 // limit each IP to 3 contact form submissions per hour
+});
+
 // Email transporter setup
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -107,6 +113,45 @@ client.connect()
     console.error('Error connecting to MongoDB:', err);
     process.exit(1);
   });
+
+// Contact form endpoint
+app.post('/api/contact', contactLimiter, async (req, res) => {
+  try {
+    const { name, email, message } = req.body;
+
+    // Validate input
+    if (!name || !email || !message) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    // Email validation regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Invalid email address' });
+    }
+
+    // Send email
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: process.env.EMAIL_USER, // Send to your email
+      replyTo: email, // Set reply-to as the sender's email
+      subject: `Contact Form Message from ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+      html: `
+        <h3>Contact Form Message</h3>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Message:</strong></p>
+        <p>${message.replace(/\n/g, '<br>')}</p>
+      `
+    });
+
+    res.status(200).json({ message: 'Message sent successfully' });
+  } catch (error) {
+    console.error('Error sending contact form message:', error);
+    res.status(500).json({ message: 'Failed to send message' });
+  }
+});
 
 // This is your Stripe CLI webhook secret for testing your endpoint locally.
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;

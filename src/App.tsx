@@ -12,6 +12,7 @@ import PaymentPlanSelection from './components/PaymentPlanSelection';
 import PaymentSuccess from './components/PaymentSuccess';
 import ResetPassword from './components/ResetPassword';
 import FAQs from './components/FAQs';
+import ContactForm from './components/ContactForm';
 import { checkAuth, clearAuthToken, registerUser, login } from './utils/api';
 import type { PersonalData, RegistrationData } from './utils/api';
 
@@ -133,6 +134,13 @@ function App() {
                 </select>
 
                 <Link
+                  to="/contact"
+                  className="mr-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                >
+                  {t('navigation.contact')}
+                </Link>
+
+                <Link
                   to="/faqs"
                   className="mr-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
                 >
@@ -226,6 +234,7 @@ function App() {
             />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/faqs" element={<FAQs />} />
+            <Route path="/contact" element={<ContactForm />} />
           </Routes>
         </main>
       </div>

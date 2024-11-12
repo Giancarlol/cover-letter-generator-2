@@ -8,7 +8,7 @@ declare global {
 }
 
 // Default to production URL if environment variable is not set
-const API_BASE_URL = window.env?.VITE_API_BASE_URL || 'https://tailored-letters-app-49dff41a7b95.herokuapp.com';
+export const API_BASE_URL = window.env?.VITE_API_BASE_URL || 'https://tailored-letters-app-49dff41a7b95.herokuapp.com';
 
 export interface RegistrationData {
   name: string;
@@ -34,6 +34,12 @@ export interface LoginResponse {
 export interface RegistrationResponse {
   message: string;
   userId: string;
+}
+
+export interface ContactFormData {
+  name: string;
+  email: string;
+  message: string;
 }
 
 // Retrieve token from localStorage each time to ensure latest state
@@ -85,6 +91,16 @@ const handleResponse = async (response: Response) => {
     );
   }
   return contentType?.includes('application/json') ? response.json() : response.text();
+};
+
+// Submit contact form
+export const submitContactForm = async (formData: ContactFormData): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/contact`, {
+    method: 'POST',
+    headers: mergeHeaders({}),
+    body: JSON.stringify(formData),
+  });
+  return handleResponse(response);
 };
 
 // Login function with token storage and user data fetching
