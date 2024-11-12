@@ -42,7 +42,8 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     customer_details: paymentIntent.customer_details,
     receipt_email: paymentIntent.receipt_email,
     metadata: paymentIntent.metadata,
-    customer: paymentIntent.customer
+    customer: paymentIntent.customer,
+    currency: paymentIntent.currency
   });
 
   const customerEmail = await getCustomerEmail(paymentIntent);
@@ -52,15 +53,23 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
   let letterCount = 0;
   let planDuration = 0; // in days
 
-  // Setting the plan details based on the payment amount
+  // Setting the plan details based on the payment amount in cents
+  // Basic Plan: $3.99 = 399 cents
+  // Premium Plan: $9.99 = 999 cents
+  console.log('Determining plan based on amount:', amount);
+  
   if (amount === 399) {
     selectedPlan = 'Basic Plan';
-    letterCount = 20; // Allow 20 letters for Basic Plan
-    planDuration = 7;  // Duration in days
+    letterCount = 20;
+    planDuration = 7;
+    console.log('Selected Basic Plan');
   } else if (amount === 999) {
     selectedPlan = 'Premium Plan';
-    letterCount = 40; // Allow 40 letters for Premium Plan
-    planDuration = 14; // Duration in days
+    letterCount = 40;
+    planDuration = 14;
+    console.log('Selected Premium Plan');
+  } else {
+    console.log('Warning: Unrecognized payment amount:', amount);
   }
 
   const subscriptionEndDate = new Date();
@@ -70,8 +79,14 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     selectedPlan, 
     letterCount, 
     email: customerEmail,
-    subscriptionEndDate 
+    subscriptionEndDate,
+    amount,
+    planDuration
   });
+
+  // First, get the current user data
+  const currentUser = await users.findOne({ email: customerEmail });
+  console.log('Current user data:', currentUser);
 
   // Update the user plan in the database
   const updateResult = await users.updateOne(
@@ -79,7 +94,7 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     {
       $set: {
         selectedPlan,
-        letterCount, // Reset letter count to plan max
+        letterCount,
         paymentStatus: 'completed',
         lastPaymentDate: new Date(),
         subscriptionEndDate,
@@ -88,7 +103,12 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     }
   );
 
-  console.log('Update result:', updateResult);
+  console.log('Update result:', {
+    matchedCount: updateResult.matchedCount,
+    modifiedCount: updateResult.modifiedCount,
+    upsertedCount: updateResult.upsertedCount,
+    upsertedId: updateResult.upsertedId
+  });
 
   if (updateResult.matchedCount === 0) {
     throw new Error(`No user found with email: ${customerEmail}`);
@@ -98,14 +118,14 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     throw new Error('Failed to update user plan');
   }
 
-  // Fetch updated user data to confirm letter count
+  // Fetch updated user data to confirm changes
   const updatedUser = await users.findOne({ email: customerEmail });
-  const currentLetterCount = updatedUser.letterCount || letterCount;
+  console.log('Updated user data:', updatedUser);
 
   // Send confirmation email
-  await sendConfirmationEmail(transporter, customerEmail, selectedPlan, currentLetterCount, subscriptionEndDate);
+  await sendConfirmationEmail(transporter, customerEmail, selectedPlan, letterCount, subscriptionEndDate);
 
-  return { customerEmail, selectedPlan, letterCount: currentLetterCount };
+  return { customerEmail, selectedPlan, letterCount };
 };
 
 // Function to handle checkout session completion
@@ -114,7 +134,9 @@ const handleCheckoutSession = async (db, session, transporter) => {
     id: session.id,
     customer_email: session.customer_email,
     customer_details: session.customer_details,
-    payment_intent: session.payment_intent
+    payment_intent: session.payment_intent,
+    amount_total: session.amount_total,
+    currency: session.currency
   });
 
   if (!session.payment_intent) {
@@ -122,6 +144,11 @@ const handleCheckoutSession = async (db, session, transporter) => {
   }
 
   const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
+  console.log('Retrieved payment intent:', {
+    id: paymentIntent.id,
+    amount: paymentIntent.amount,
+    status: paymentIntent.status
+  });
   
   // Add checkout session ID to payment intent metadata for tracking
   await stripe.paymentIntents.update(paymentIntent.id, {

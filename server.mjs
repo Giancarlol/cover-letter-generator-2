@@ -516,32 +516,42 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     const { email } = req.user;
     const users = db.collection('users');
 
+    // First get the current user data
+    const user = await users.findOne({ email });
+    console.log('Current user data:', user);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
     // Get the latest payment session for this user
     const latestPayment = await users.findOne(
       { 
         email,
-        paymentStatus: 'completed'
+        stripePaymentIntentId: { $exists: true },
+        lastPaymentDate: { $exists: true }
       },
       { 
-        sort: { lastPaymentDate: -1 },
-        projection: { selectedPlan: 1, letterCount: 1, lastPaymentDate: 1 }
+        sort: { lastPaymentDate: -1 }
       }
     );
 
     console.log('Latest payment found:', latestPayment);
 
-    if (latestPayment) {
+    if (latestPayment && latestPayment.selectedPlan !== user.selectedPlan) {
       // Update the user with the latest payment information
-      await users.updateOne(
+      const updateResult = await users.updateOne(
         { email },
         { 
           $set: { 
             selectedPlan: latestPayment.selectedPlan,
             letterCount: latestPayment.letterCount,
-            lastPaymentDate: latestPayment.lastPaymentDate
+            lastPaymentDate: latestPayment.lastPaymentDate,
+            subscriptionEndDate: latestPayment.subscriptionEndDate
           }
         }
       );
+      console.log('Update result:', updateResult);
     }
 
     // Get and return the updated user data
