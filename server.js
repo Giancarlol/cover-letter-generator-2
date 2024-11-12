@@ -14,7 +14,6 @@ const crypto = require('crypto');
 const path = require('path');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { handleWebhook } = require('./src/webhooks/stripeWebhook');
-const franc = require('franc');
 
 const app = express();
 
@@ -123,6 +122,9 @@ const getLetterCountForPlan = (plan) => {
 
 // Helper function to generate cover letter using OpenAI
 async function generateWithOpenAI(personalData, jobAd) {
+  // Dynamically import franc
+  const { franc } = await import('franc');
+  
   // Detect the language of the job advertisement
   const detectedLangCode = franc(jobAd);
   const detectedLanguage = languageNames[detectedLangCode] || 'English'; // Default to English if detection fails
@@ -162,6 +164,9 @@ Guidelines:
 // Helper function to generate cover letter using Gemini
 async function generateWithGemini(personalData, jobAd) {
   const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+  
+  // Dynamically import franc
+  const { franc } = await import('franc');
   
   // Detect the language of the job advertisement
   const detectedLangCode = franc(jobAd);
@@ -214,6 +219,14 @@ const authenticateToken = (req, res, next) => {
 };
 
 // API Routes
+
+// Endpoint to serve environment variables
+app.get('/api/config', (req, res) => {
+  res.json({
+    VITE_STRIPE_PUBLISHABLE_KEY: process.env.VITE_STRIPE_PUBLISHABLE_KEY,
+    VITE_API_BASE_URL: process.env.CLIENT_URL
+  });
+});
 
 // Special raw body parsing for Stripe webhooks
 app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
