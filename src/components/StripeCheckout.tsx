@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStripe } from '@stripe/react-stripe-js';
 
 declare global {
@@ -20,20 +20,39 @@ interface StripeCheckoutProps {
 
 const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, onError }) => {
   const stripe = useStripe();
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
   useEffect(() => {
-    // Store plan details in sessionStorage for verification
-    sessionStorage.setItem('pendingPlan', JSON.stringify({
-      name: planName,
-      price: planPrice,
-      timestamp: new Date().toISOString()
-    }));
-  }, [planName, planPrice]);
+    // Wait for config to be loaded
+    const checkConfig = () => {
+      if (window.env) {
+        setIsConfigLoaded(true);
+      } else {
+        setTimeout(checkConfig, 100);
+      }
+    };
+    checkConfig();
+  }, []);
+
+  useEffect(() => {
+    if (isConfigLoaded) {
+      // Store plan details in sessionStorage for verification
+      sessionStorage.setItem('pendingPlan', JSON.stringify({
+        name: planName,
+        price: planPrice,
+        timestamp: new Date().toISOString()
+      }));
+    }
+  }, [planName, planPrice, isConfigLoaded]);
 
   const handleCheckout = async () => {
     try {
       if (!stripe) {
         throw new Error('Failed to initialize Stripe');
+      }
+
+      if (!isConfigLoaded) {
+        throw new Error('Configuration not yet loaded');
       }
 
       // Get the auth token from localStorage
@@ -107,6 +126,10 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
       onError(error instanceof Error ? error.message : 'An error occurred during checkout');
     }
   };
+
+  if (!isConfigLoaded) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <button

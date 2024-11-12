@@ -6,12 +6,16 @@
     <link rel="icon" href="data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA/4QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREQAAAAAAEAAAEAAAAAEAAAABAAAAEAAAAAAQAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAEAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//wAA//8AAP//AAD8HwAA++8AAPf3AADv+wAA7/sAAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA" type="image/x-icon" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Cover Letter Generator</title>
-    <!-- Inject environment variables at runtime -->
+    <!-- Fetch environment variables at runtime -->
     <script>
-      window.env = {
-        VITE_STRIPE_PUBLISHABLE_KEY: "pk_test_51QAGy1GoUpqFMLMQxQeRYN2Kl2ttRTANp5qPZtjgX9WoJsJuO3x382WRJDbeW6cIpm2C4RXu0v7YoWfoclVKZQbD006Keh8NhW",
-        VITE_API_BASE_URL: "https://tailoredlettersai.com"
-      };
+      fetch('/api/config')
+        .then(response => response.json())
+        .then(config => {
+          window.env = config;
+        })
+        .catch(error => {
+          console.error('Error loading config:', error);
+        });
     </script>
   </head>
   <body>

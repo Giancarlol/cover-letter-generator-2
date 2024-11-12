@@ -1,4 +1,5 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+import Stripe from 'stripe';
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Function to get the customer's email from the payment intent or related objects
 const getCustomerEmail = async (paymentIntent) => {
@@ -202,6 +203,4 @@ const handleWebhook = async (req, endpointSecret, db, transporter) => {
   }
 };
 
-module.exports = {
-  handleWebhook
-};
+export { handleWebhook };

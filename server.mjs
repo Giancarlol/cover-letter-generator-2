@@ -1,21 +1,28 @@
 // Load environment variables first
-require('dotenv').config();
+import dotenv from 'dotenv';
+import express from 'express';
+import { MongoClient } from 'mongodb';
+import cors from 'cors';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { OpenAI } from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import rateLimit from 'express-rate-limit';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
+import path from 'path';
+import Stripe from 'stripe';
+import { handleWebhook } from './src/webhooks/stripeWebhook.mjs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-const express = require('express');
-const { MongoClient, ObjectId } = require('mongodb');
-const cors = require('cors');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const { OpenAI } = require('openai');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const rateLimit = require('express-rate-limit');
-const nodemailer = require('nodemailer');
-const crypto = require('crypto');
-const path = require('path');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { handleWebhook } = require('./src/webhooks/stripeWebhook');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config();
 
 const app = express();
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Initialize AI models
 const openai = new OpenAI({
@@ -516,4 +523,4 @@ app.listen(port, () => {
 });
 
 // Export the app for testing
-module.exports = app;
+export default app;
