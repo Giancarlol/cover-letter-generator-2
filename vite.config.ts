@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
+  // Using empty string as prefix to load all env vars
   const env = loadEnv(mode, process.cwd(), '');
   
   return {
@@ -31,11 +32,14 @@ export default defineConfig(({ mode }) => {
       }
     },
     define: {
-      // Explicitly stringify all environment variables
+      // Ensure environment variables are properly stringified and available at runtime
       'window.env': {
         VITE_STRIPE_PUBLISHABLE_KEY: JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || ''),
-        VITE_API_BASE_URL: JSON.stringify('/api')
-      }
+        VITE_API_BASE_URL: JSON.stringify(env.VITE_API_BASE_URL || '/api')
+      },
+      // Also make them available through import.meta.env
+      'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || ''),
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL || '/api')
     },
     build: {
       rollupOptions: {

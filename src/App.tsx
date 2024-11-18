@@ -25,21 +25,26 @@ declare global {
   }
 }
 
-// Debug log for Stripe key
-console.log('Environment:', import.meta.env.MODE);
-console.log('Window Stripe Key:', window.env?.VITE_STRIPE_PUBLISHABLE_KEY);
-if (!window.env?.VITE_STRIPE_PUBLISHABLE_KEY) {
-  console.error('Stripe publishable key is missing!');
-}
-
-// Initialize Stripe with window.env
-const stripePromise = loadStripe(window.env?.VITE_STRIPE_PUBLISHABLE_KEY || '');
-
 function App() {
   const { t, i18n } = useTranslation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userData, setUserData] = useState<PersonalData | null>(null);
   const [showPaymentPlan, setShowPaymentPlan] = useState(false);
+  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
+
+  // Initialize Stripe after environment variables are loaded
+  useEffect(() => {
+    const initStripe = () => {
+      if (window.env?.VITE_STRIPE_PUBLISHABLE_KEY) {
+        console.log('Initializing Stripe with key:', window.env.VITE_STRIPE_PUBLISHABLE_KEY);
+        setStripePromise(loadStripe(window.env.VITE_STRIPE_PUBLISHABLE_KEY));
+      } else {
+        console.error('Stripe publishable key is missing!');
+        setTimeout(initStripe, 100); // Retry if env vars aren't loaded yet
+      }
+    };
+    initStripe();
+  }, []);
 
   const loadUserData = useCallback(async () => {
     try {
@@ -107,6 +112,10 @@ function App() {
   const changeLanguage = (language: string) => {
     i18n.changeLanguage(language);
   };
+
+  if (!stripePromise) {
+    return <div>Loading Stripe...</div>;
+  }
 
   return (
     <Elements stripe={stripePromise}>

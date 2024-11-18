@@ -1,15 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStripe } from '@stripe/react-stripe-js';
 
-declare global {
-  interface Window {
-    env: {
-      VITE_STRIPE_PUBLISHABLE_KEY: string;
-      VITE_API_BASE_URL: string;
-    };
-  }
-}
-
 interface StripeCheckoutProps {
   planName: string;
   planPrice: number;
@@ -18,39 +9,14 @@ interface StripeCheckoutProps {
 
 const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, onError }) => {
   const stripe = useStripe();
-  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
-
-  useEffect(() => {
-    // Wait for config to be loaded
-    const checkConfig = () => {
-      if (window.env) {
-        setIsConfigLoaded(true);
-      } else {
-        setTimeout(checkConfig, 100);
-      }
-    };
-    checkConfig();
-  }, []);
-
-  useEffect(() => {
-    if (isConfigLoaded) {
-      // Store plan details in sessionStorage for verification
-      sessionStorage.setItem('pendingPlan', JSON.stringify({
-        name: planName,
-        price: planPrice,
-        timestamp: new Date().toISOString()
-      }));
-    }
-  }, [planName, planPrice, isConfigLoaded]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleCheckout = async () => {
     try {
+      setIsLoading(true);
+
       if (!stripe) {
         throw new Error('Failed to initialize Stripe');
-      }
-
-      if (!isConfigLoaded) {
-        throw new Error('Configuration not yet loaded');
       }
 
       // Get the auth token from localStorage
@@ -119,22 +85,28 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
     } catch (error) {
       console.error('Stripe checkout error:', error);
       // Clear stored data on error
-      sessionStorage.removeItem('pendingPlan');
       sessionStorage.removeItem('checkoutSessionId');
       onError(error instanceof Error ? error.message : 'An error occurred during checkout');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (!isConfigLoaded) {
-    return <div>Loading...</div>;
+  if (!stripe) {
+    return <div className="text-center p-4">Loading payment system...</div>;
   }
 
   return (
     <button
       onClick={handleCheckout}
-      className="mt-8 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center bg-indigo-600 hover:bg-indigo-700"
+      disabled={isLoading}
+      className={`mt-8 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center ${
+        isLoading 
+          ? 'bg-indigo-400 cursor-not-allowed' 
+          : 'bg-indigo-600 hover:bg-indigo-700'
+      }`}
     >
-      Subscribe to {planName}
+      {isLoading ? 'Processing...' : `Subscribe to ${planName}`}
     </button>
   );
 };
