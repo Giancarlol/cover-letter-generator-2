@@ -548,7 +548,7 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
     const { email } = req.user;
     const users = db.collection('users');
 
-    // First get the current user data
+    // Get the current user data
     const user = await users.findOne({ email });
     console.log('Current user data:', user);
 
@@ -556,44 +556,9 @@ app.post('/api/update-plan-status', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Get the latest payment session for this user
-    const latestPayment = await users.findOne(
-      { 
-        email,
-        stripePaymentIntentId: { $exists: true },
-        lastPaymentDate: { $exists: true }
-      },
-      { 
-        sort: { lastPaymentDate: -1 }
-      }
-    );
-
-    console.log('Latest payment found:', latestPayment);
-
-    if (latestPayment && latestPayment.selectedPlan !== user.selectedPlan) {
-      // Update the user with the latest payment information
-      const updateResult = await users.updateOne(
-        { email },
-        { 
-          $set: { 
-            selectedPlan: latestPayment.selectedPlan,
-            letterCount: latestPayment.letterCount,
-            lastPaymentDate: latestPayment.lastPaymentDate,
-            subscriptionEndDate: latestPayment.subscriptionEndDate
-          }
-        }
-      );
-      console.log('Update result:', updateResult);
-    }
-
-    // Get and return the updated user data
-    const userData = await users.findOne(
-      { email }, 
-      { projection: { password: 0 } }
-    );
-
-    console.log('Returning updated user data:', userData);
-    res.status(200).json(userData);
+    // Simply return the current user data since the webhook has already updated it if necessary
+    console.log('Returning current user data:', user);
+    res.status(200).json(user);
 
   } catch (error) {
     console.error('Server Error:', error);
