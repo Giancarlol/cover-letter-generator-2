@@ -12,9 +12,10 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          target: 'https://tailored-letters-app-49dff41a7b95.herokuapp.com',
           changeOrigin: true,
           secure: false,
+          rewrite: (path) => path.replace(/^\/api/, '/api')
         }
       },
       headers: {
@@ -24,18 +25,17 @@ export default defineConfig(({ mode }) => {
           style-src 'self' 'unsafe-inline';
           img-src 'self' data: blob: https:;
           font-src 'self';
-          connect-src 'self' http://localhost:* ws://localhost:* https://*.stripe.com https://tailoredlettersai.com;
+          connect-src 'self' http://localhost:* ws://localhost:* https://*.stripe.com https://tailored-letters-app-49dff41a7b95.herokuapp.com;
           frame-src 'self' https://*.stripe.com;
         `.replace(/\s+/g, ' ').trim()
       }
     },
     define: {
       // Explicitly stringify all environment variables
-      'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || ''),
-      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL || ''),
-      // Add a flag to check if we're in production
-      'import.meta.env.PROD': mode === 'production',
-      'import.meta.env.DEV': mode === 'development'
+      'window.env': {
+        VITE_STRIPE_PUBLISHABLE_KEY: JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || ''),
+        VITE_API_BASE_URL: JSON.stringify('/api')
+      }
     },
     build: {
       rollupOptions: {

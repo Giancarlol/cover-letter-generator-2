@@ -22,14 +22,16 @@ const __dirname = dirname(__filename);
 dotenv.config();
 
 const app = express();
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Initialize AI models
-const openai = new OpenAI({
+// Initialize Stripe only if we have a secret key
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+// Initialize AI models only if we have API keys
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
-});
+}) : null;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 // Language mapping for more readable names
 const languageNames = {
@@ -45,8 +47,23 @@ app.set('trust proxy', 1);
 const port = process.env.PORT || 3001;
 
 // CORS configuration
+const allowedOrigins = [
+  'https://tailoredlettersai.com',
+  'https://www.tailoredlettersai.com',
+  'http://localhost:5173' // Allow local development
+];
+
 app.use(cors({
-  origin: ['https://tailoredlettersai.com', 'https://www.tailoredlettersai.com'],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -81,23 +98,22 @@ const contactLimiter = rateLimit({
   max: 3 // limit each IP to 3 contact form submissions per hour
 });
 
-// Email transporter setup
-const transporter = nodemailer.createTransport({
+// Email transporter setup - only if credentials are provided
+const transporter = process.env.EMAIL_USER && process.env.EMAIL_PASSWORD ? nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD
   }
-});
+}) : null;
 
 // MongoDB connection
 const uri = process.env.MONGODB_URI;
 if (!uri) {
-  console.error('Error: MONGODB_URI is not defined in your environment variables.');
-  process.exit(1);
+  console.error('Warning: MONGODB_URI is not defined in your environment variables.');
 }
 
-const client = new MongoClient(uri, {
+const client = new MongoClient(uri || 'mongodb://localhost:27017/coverLetterGenerator', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
@@ -130,26 +146,30 @@ app.post('/api/contact', contactLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Invalid email address' });
     }
 
-    // Send email
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER, // Send to your email
-      replyTo: email, // Set reply-to as the sender's email
-      subject: `Contact Form Message from ${name}`,
-      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
-      html: `
-        <h3>Contact Form Message</h3>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Message:</strong></p>
-        <p>${message.replace(/\n/g, '<br>')}</p>
-      `
-    });
+    // Send email if transporter is configured
+    if (transporter) {
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: process.env.EMAIL_USER,
+        replyTo: email,
+        subject: `Contact Form Message from ${name}`,
+        text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+        html: `
+          <h3>Contact Form Message</h3>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Message:</strong></p>
+          <p>${message.replace(/\n/g, '<br>')}</p>
+        `
+      });
+    } else {
+      console.log('Email not sent - transporter not configured');
+    }
 
-    res.status(200).json({ message: 'Message sent successfully' });
+    res.status(200).json({ message: 'Message received successfully' });
   } catch (error) {
-    console.error('Error sending contact form message:', error);
-    res.status(500).json({ message: 'Failed to send message' });
+    console.error('Error handling contact form message:', error);
+    res.status(500).json({ message: 'Failed to process message' });
   }
 });
 
@@ -157,7 +177,7 @@ app.post('/api/contact', contactLimiter, async (req, res) => {
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 // JWT configuration
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'development-jwt-secret';
 
 // Helper function to get letter count based on plan
 const getLetterCountForPlan = (plan) => {
@@ -174,12 +194,16 @@ const getLetterCountForPlan = (plan) => {
 
 // Helper function to generate cover letter using OpenAI
 async function generateWithOpenAI(personalData, jobAd) {
+  if (!openai) {
+    throw new Error('OpenAI API key not configured');
+  }
+
   // Dynamically import franc
   const { franc } = await import('franc');
   
   // Detect the language of the job advertisement
   const detectedLangCode = franc(jobAd);
-  const detectedLanguage = languageNames[detectedLangCode] || 'English'; // Default to English if detection fails
+  const detectedLanguage = languageNames[detectedLangCode] || 'English';
 
   const prompt = `You are an expert cover letter writer with extensive experience in professional recruitment and HR. Your task is to create a compelling, tailored cover letter that highlights the candidate's most relevant qualifications, skills, and accomplishments for this specific job.
 
@@ -215,6 +239,10 @@ Guidelines:
 
 // Helper function to generate cover letter using Gemini
 async function generateWithGemini(personalData, jobAd) {
+  if (!genAI) {
+    throw new Error('Gemini API key not configured');
+  }
+
   const model = genAI.getGenerativeModel({ model: "gemini-pro" });
   
   // Dynamically import franc
@@ -222,7 +250,7 @@ async function generateWithGemini(personalData, jobAd) {
   
   // Detect the language of the job advertisement
   const detectedLangCode = franc(jobAd);
-  const detectedLanguage = languageNames[detectedLangCode] || 'English'; // Default to English if detection fails
+  const detectedLanguage = languageNames[detectedLangCode] || 'English';
   
   const prompt = `You are an expert cover letter writer with extensive experience in professional recruitment and HR. Your task is to create a compelling, tailored cover letter that highlights the candidate's most relevant qualifications, skills, and accomplishments for this specific job.
 
@@ -275,8 +303,8 @@ const authenticateToken = (req, res, next) => {
 // Endpoint to serve environment variables
 app.get('/api/config', (req, res) => {
   res.json({
-    VITE_STRIPE_PUBLISHABLE_KEY: process.env.VITE_STRIPE_PUBLISHABLE_KEY,
-    VITE_API_BASE_URL: process.env.CLIENT_URL
+    VITE_STRIPE_PUBLISHABLE_KEY: process.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
+    VITE_API_BASE_URL: process.env.CLIENT_URL || 'http://localhost:5173'
   });
 });
 
@@ -293,6 +321,10 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
 
 // Create Stripe checkout session
 app.post('/api/create-checkout-session', authenticateToken, async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Payment service not available' });
+  }
+
   try {
     const { planName, planPrice } = req.body;
     const userEmail = req.user.email;
@@ -317,7 +349,7 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       });
     }
 
-    const baseUrl = process.env.CLIENT_URL;
+    const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
@@ -371,7 +403,7 @@ app.post('/api/register', authLimiter, async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const selectedPlan = 'Free Plan';
-    const letterCount = getLetterCountForPlan(selectedPlan); // Set initial letter count based on Free Plan
+    const letterCount = getLetterCountForPlan(selectedPlan);
 
     const result = await users.insertOne({
       name,

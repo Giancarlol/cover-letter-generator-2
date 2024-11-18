@@ -7,8 +7,8 @@ declare global {
   }
 }
 
-// Default to production URL if environment variable is not set
-export const API_BASE_URL = window.env?.VITE_API_BASE_URL || 'https://tailored-letters-app-49dff41a7b95.herokuapp.com';
+// Use relative path for API requests
+export const API_BASE_URL = '/api';
 
 export interface RegistrationData {
   name: string;
@@ -95,7 +95,7 @@ const handleResponse = async (response: Response) => {
 
 // Submit contact form
 export const submitContactForm = async (formData: ContactFormData): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/api/contact`, {
+  const response = await fetch(`${API_BASE_URL}/contact`, {
     method: 'POST',
     headers: mergeHeaders({}),
     body: JSON.stringify(formData),
@@ -106,7 +106,7 @@ export const submitContactForm = async (formData: ContactFormData): Promise<void
 // Login function with token storage and user data fetching
 export const login = async (email: string, password: string): Promise<LoginResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/login`, {
+    const response = await fetch(`${API_BASE_URL}/login`, {
       method: 'POST',
       headers: mergeHeaders({}),
       body: JSON.stringify({ email, password }),
@@ -133,7 +133,7 @@ export const logout = () => {
 
 // Register a user
 export const registerUser = async (userData: RegistrationData): Promise<RegistrationResponse> => {
-  const response = await fetch(`${API_BASE_URL}/api/register`, {
+  const response = await fetch(`${API_BASE_URL}/register`, {
     method: 'POST',
     headers: mergeHeaders({}),
     body: JSON.stringify(userData),
@@ -143,7 +143,7 @@ export const registerUser = async (userData: RegistrationData): Promise<Registra
 
 // Update user data with authorization
 export const updateUser = async (email: string, updateData: Partial<PersonalData>) => {
-  const response = await fetch(`${API_BASE_URL}/api/users/${email}`, {
+  const response = await fetch(`${API_BASE_URL}/users/${email}`, {
     method: 'PUT',
     headers: mergeHeaders(getAuthHeaders()),
     body: JSON.stringify(updateData),
@@ -153,7 +153,7 @@ export const updateUser = async (email: string, updateData: Partial<PersonalData
 
 // Get user data with authorization
 export const getUser = async (email: string): Promise<PersonalData> => {
-  const response = await fetch(`${API_BASE_URL}/api/users/${email}`, {
+  const response = await fetch(`${API_BASE_URL}/users/${email}`, {
     headers: mergeHeaders(getAuthHeaders()),
   });
   return handleResponse(response);
@@ -161,7 +161,7 @@ export const getUser = async (email: string): Promise<PersonalData> => {
 
 // Generate cover letter with authorization
 export const generateCoverLetter = async (personalData: PersonalData, jobAd: string): Promise<string> => {
-  const response = await fetch(`${API_BASE_URL}/api/generate-cover-letter`, {
+  const response = await fetch(`${API_BASE_URL}/generate-cover-letter`, {
     method: 'POST',
     headers: mergeHeaders(getAuthHeaders()),
     body: JSON.stringify({ personalData, jobAd }),
@@ -177,7 +177,7 @@ export const checkAuth = async (): Promise<PersonalData | null> => {
     return null;
   }
   try {
-    const response = await fetch(`${API_BASE_URL}/api/check-auth`, {
+    const response = await fetch(`${API_BASE_URL}/check-auth`, {
       headers: mergeHeaders(getAuthHeaders()),
     });
     return handleResponse(response);
@@ -190,7 +190,7 @@ export const checkAuth = async (): Promise<PersonalData | null> => {
 
 // Request password reset
 export const requestPasswordReset = async (email: string): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/api/reset-password`, {
+  const response = await fetch(`${API_BASE_URL}/reset-password`, {
     method: 'POST',
     headers: mergeHeaders({}),
     body: JSON.stringify({ email }),
@@ -200,7 +200,7 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
 
 // Reset password
 export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/api/reset-password/confirm`, {
+  const response = await fetch(`${API_BASE_URL}/reset-password/confirm`, {
     method: 'POST',
     headers: mergeHeaders({}),
     body: JSON.stringify({ token, newPassword }),
@@ -225,7 +225,7 @@ export const refreshUserData = async (): Promise<PersonalData | null> => {
 
     // Update the user's plan status on the server
     console.log('Making update-plan-status request');
-    const response = await fetch(`${API_BASE_URL}/api/update-plan-status`, {
+    const response = await fetch(`${API_BASE_URL}/update-plan-status`, {
       method: 'POST',
       headers: mergeHeaders(headers),
       body: JSON.stringify({ email: currentUser.email }),

@@ -1,11 +1,13 @@
 import Stripe from 'stripe';
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Initialize Stripe only if we have a secret key
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 // Function to get the customer's email from the payment intent or related objects
 const getCustomerEmail = async (paymentIntent) => {
   let email = paymentIntent.receipt_email || paymentIntent.customer_details?.email || paymentIntent.metadata?.email;
 
-  if (!email && paymentIntent.customer) {
+  if (!email && paymentIntent.customer && stripe) {
     try {
       const customer = await stripe.customers.retrieve(paymentIntent.customer);
       email = customer.email;
@@ -14,7 +16,7 @@ const getCustomerEmail = async (paymentIntent) => {
     }
   }
 
-  if (!email && paymentIntent.metadata?.checkout_session_id) {
+  if (!email && paymentIntent.metadata?.checkout_session_id && stripe) {
     try {
       const session = await stripe.checkout.sessions.retrieve(paymentIntent.metadata.checkout_session_id);
       email = session.customer_email || session.customer_details?.email;
@@ -130,6 +132,11 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
 
 // Function to handle checkout session completion
 const handleCheckoutSession = async (db, session, transporter) => {
+  if (!stripe) {
+    console.log('Stripe is not initialized - skipping checkout session processing');
+    return null;
+  }
+
   console.log('Processing checkout session:', {
     id: session.id,
     customer_email: session.customer_email,
@@ -187,6 +194,12 @@ const sendConfirmationEmail = async (transporter, customerEmail, selectedPlan, l
 
 // Main webhook handler function
 const handleWebhook = async (req, endpointSecret, db, transporter) => {
+  // For local development without Stripe
+  if (!stripe) {
+    console.log('Stripe is not initialized - webhook handling skipped');
+    return { success: true, result: null };
+  }
+
   try {
     const sig = req.headers['stripe-signature'];
     
