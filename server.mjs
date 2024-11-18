@@ -303,7 +303,7 @@ const authenticateToken = (req, res, next) => {
 // Endpoint to serve environment variables
 app.get('/api/config', (req, res) => {
   res.json({
-    VITE_STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
+    VITE_STRIPE_PUBLISHABLE_KEY: process.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
     VITE_API_BASE_URL: process.env.CLIENT_URL || 'http://localhost:5173'
   });
 });
