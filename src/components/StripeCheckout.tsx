@@ -10,8 +10,6 @@ declare global {
   }
 }
 
-const API_BASE_URL = window.env?.VITE_API_BASE_URL || 'http://localhost:3001';
-
 interface StripeCheckoutProps {
   planName: string;
   planPrice: number;
@@ -67,8 +65,8 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
         timestamp: new Date().toISOString()
       });
 
-      // Use the full URL instead of relative path
-      const response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
+      // Use the API endpoint directly since proxy is configured
+      const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
