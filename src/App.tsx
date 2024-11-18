@@ -32,18 +32,25 @@ function App() {
   const [showPaymentPlan, setShowPaymentPlan] = useState(false);
   const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
 
-  // Initialize Stripe after environment variables are loaded
+  // Fetch Stripe publishable key from API
   useEffect(() => {
-    const initStripe = () => {
-      if (window.env?.VITE_STRIPE_PUBLISHABLE_KEY) {
-        console.log('Initializing Stripe with key:', window.env.VITE_STRIPE_PUBLISHABLE_KEY);
-        setStripePromise(loadStripe(window.env.VITE_STRIPE_PUBLISHABLE_KEY));
-      } else {
-        console.error('Stripe publishable key is missing!');
-        setTimeout(initStripe, 100); // Retry if env vars aren't loaded yet
+    const fetchConfig = async () => {
+      try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        
+        if (data.VITE_STRIPE_PUBLISHABLE_KEY) {
+          console.log('Initializing Stripe with key from API');
+          setStripePromise(loadStripe(data.VITE_STRIPE_PUBLISHABLE_KEY));
+        } else {
+          console.error('Stripe publishable key not found in API response');
+        }
+      } catch (error) {
+        console.error('Error fetching config:', error);
       }
     };
-    initStripe();
+    
+    fetchConfig();
   }, []);
 
   const loadUserData = useCallback(async () => {

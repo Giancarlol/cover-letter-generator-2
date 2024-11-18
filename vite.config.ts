@@ -34,12 +34,9 @@ export default defineConfig(({ mode }) => {
     define: {
       // Ensure environment variables are properly stringified and available at runtime
       'window.env': {
-        VITE_STRIPE_PUBLISHABLE_KEY: JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || ''),
+        VITE_STRIPE_PUBLISHABLE_KEY: JSON.stringify(env.STRIPE_PUBLISHABLE_KEY || ''),
         VITE_API_BASE_URL: JSON.stringify(env.VITE_API_BASE_URL || '/api')
-      },
-      // Also make them available through import.meta.env
-      'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || ''),
-      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL || '/api')
+      }
     },
     build: {
       rollupOptions: {
