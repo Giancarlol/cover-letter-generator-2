@@ -22,15 +22,10 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
         const sessionId = sessionStorage.getItem('checkoutSessionId');
         const pendingPlan = pendingPlanStr ? JSON.parse(pendingPlanStr) : null;
 
-        console.log(`Attempt ${attempts + 1} of ${MAX_ATTEMPTS} to verify payment...`, {
-          pendingPlan,
-          sessionId,
-          timestamp: new Date().toISOString()
-        });
+        console.log(`Attempt ${attempts + 1} of ${MAX_ATTEMPTS} to verify payment...`);
         
         // Get current user data
         const userData = await refreshUserData();
-        console.log('Received user data:', userData);
         
         if (!userData) {
           throw new Error('Failed to fetch user data');
@@ -38,7 +33,6 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
 
         // Always update the UI with latest user data
         if (onUpdateUser) {
-          console.log('Updating user data in parent component');
           await onUpdateUser(userData);
         }
 
@@ -47,11 +41,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
 
         // If plan is updated, clean up and redirect
         if (planUpdated) {
-          console.log('Plan update confirmed:', {
-            newPlan: userData.selectedPlan,
-            letterCount: userData.letterCount,
-            timestamp: new Date().toISOString()
-          });
+          console.log('Payment verification successful');
 
           // Clean up stored data
           sessionStorage.removeItem('pendingPlan');
@@ -64,14 +54,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
 
         // If we've made all attempts and plan isn't updated, show a warning
         if (attempts >= MAX_ATTEMPTS - 1) {
-          const errorDetails = {
-            pendingPlan,
-            sessionId,
-            currentPlan: userData.selectedPlan,
-            attempts,
-            timestamp: new Date().toISOString()
-          };
-          console.log('Payment verification incomplete:', errorDetails);
+          console.log('Payment verification timeout');
           
           setError(`Your payment is being processed. If your plan is not updated within 24 hours, please contact support with reference: ${sessionId}`);
           
@@ -85,11 +68,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
         }
 
         // If plan is still not updated and we have more attempts, retry
-        console.log('Plan not yet updated, will retry...', {
-          currentPlan: userData.selectedPlan,
-          attempt: attempts + 1,
-          timestamp: new Date().toISOString()
-        });
+        console.log('Payment verification pending, retrying...');
         setAttempts(prev => prev + 1);
         
       } catch (error) {

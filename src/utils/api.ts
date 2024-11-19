@@ -73,7 +73,6 @@ const handleResponse = async (response: Response) => {
     console.error('API Error Response:', {
       status: response.status,
       statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
       url: response.url
     });
     
@@ -221,7 +220,6 @@ export const refreshUserData = async (): Promise<PersonalData | null> => {
     }
 
     const headers = getAuthHeaders();
-    console.log('Auth headers:', headers);
 
     // Update the user's plan status on the server
     console.log('Making update-plan-status request');
@@ -234,7 +232,6 @@ export const refreshUserData = async (): Promise<PersonalData | null> => {
     console.log('Update plan status response:', {
       status: response.status,
       statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
       url: response.url
     });
 

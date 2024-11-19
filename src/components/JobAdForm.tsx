@@ -16,10 +16,6 @@ const JobAdForm: React.FC<JobAdFormProps> = ({ personalData, onUpdate }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    console.log('JobAdForm received updated personalData:', personalData);
-  }, [personalData]);
-
   const getMaxLetters = (plan: string) => {
     switch (plan) {
       case t('plans.freePlan'):

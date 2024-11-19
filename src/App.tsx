@@ -40,7 +40,6 @@ function App() {
         const data = await response.json();
         
         if (data.VITE_STRIPE_PUBLISHABLE_KEY) {
-          console.log('Initializing Stripe with key from API');
           setStripePromise(loadStripe(data.VITE_STRIPE_PUBLISHABLE_KEY));
         } else {
           console.error('Stripe publishable key not found in API response');
@@ -57,7 +56,6 @@ function App() {
     try {
       const user = await checkAuth();
       if (user) {
-        console.log('Loaded user data:', user);
         setIsAuthenticated(true);
         setUserData(user);
       } else {
@@ -111,7 +109,6 @@ function App() {
   };
 
   const handleUpdateUser = async (updatedUserData: PersonalData) => {
-    console.log('Updating user data:', updatedUserData);
     setUserData(updatedUserData);
     await loadUserData();
   };
