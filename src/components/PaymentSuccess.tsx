@@ -11,7 +11,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
-  const MAX_ATTEMPTS = 3;
+  const MAX_ATTEMPTS = 5; // Increased from 3 to 5 attempts
   const RETRY_DELAY = 2000; // 2 seconds
 
   useEffect(() => {
@@ -42,8 +42,28 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
           await onUpdateUser(userData);
         }
 
+        // Check if the plan has been updated
+        const planUpdated = pendingPlan && userData.selectedPlan !== 'Free Plan';
+
+        // If plan is updated, clean up and redirect
+        if (planUpdated) {
+          console.log('Plan update confirmed:', {
+            newPlan: userData.selectedPlan,
+            letterCount: userData.letterCount,
+            timestamp: new Date().toISOString()
+          });
+
+          // Clean up stored data
+          sessionStorage.removeItem('pendingPlan');
+          sessionStorage.removeItem('checkoutSessionId');
+
+          // Navigate home
+          navigate('/');
+          return;
+        }
+
         // If we've made all attempts and plan isn't updated, show a warning
-        if (userData.selectedPlan === 'Free Plan' && attempts >= MAX_ATTEMPTS - 1) {
+        if (attempts >= MAX_ATTEMPTS - 1) {
           const errorDetails = {
             pendingPlan,
             sessionId,
@@ -64,30 +84,13 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
           return;
         }
 
-        // If plan is still free and we have more attempts, retry
-        if (userData.selectedPlan === 'Free Plan' && attempts < MAX_ATTEMPTS - 1) {
-          console.log('Plan not yet updated, will retry...', {
-            currentPlan: userData.selectedPlan,
-            attempt: attempts + 1,
-            timestamp: new Date().toISOString()
-          });
-          setAttempts(prev => prev + 1);
-          return;
-        }
-
-        // Success - plan was updated or we're out of attempts
-        console.log('Payment verification complete:', {
-          finalPlan: userData.selectedPlan,
-          attempts,
+        // If plan is still not updated and we have more attempts, retry
+        console.log('Plan not yet updated, will retry...', {
+          currentPlan: userData.selectedPlan,
+          attempt: attempts + 1,
           timestamp: new Date().toISOString()
         });
-
-        // Clean up stored data
-        sessionStorage.removeItem('pendingPlan');
-        sessionStorage.removeItem('checkoutSessionId');
-
-        // Navigate home
-        navigate('/');
+        setAttempts(prev => prev + 1);
         
       } catch (error) {
         console.error('Error verifying payment:', error);

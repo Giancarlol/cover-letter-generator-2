@@ -333,23 +333,36 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    console.log('Creating checkout session for:', {
+      email: userEmail,
+      planName,
+      planPrice,
+      timestamp: new Date().toISOString()
+    });
+
     // First, try to find an existing customer or create a new one
     let customer;
     const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
     
     if (customers.data.length > 0) {
       customer = customers.data[0];
+      console.log('Found existing customer:', customer.id);
     } else {
       customer = await stripe.customers.create({
         email: userEmail,
         metadata: {
           planName,
-          planPrice: planPrice.toString()
+          planPrice: planPrice.toString(),
+          timestamp: new Date().toISOString()
         }
       });
+      console.log('Created new customer:', customer.id);
     }
 
     const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+
+    // Create a more detailed product name
+    const productName = `${planName} - Cover Letter Generator`;
 
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
@@ -357,14 +370,21 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
       metadata: {
         planName,
         planPrice: planPrice.toString(),
-        userEmail: userEmail
+        userEmail,
+        timestamp: new Date().toISOString(),
+        letterCount: getLetterCountForPlan(planName).toString()
       },
       line_items: [
         {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: planName,
+              name: productName,
+              metadata: {
+                planName,
+                planPrice: planPrice.toString(),
+                letterCount: getLetterCountForPlan(planName).toString()
+              }
             },
             unit_amount: planPrice,
           },
@@ -379,7 +399,12 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
     console.log('Created checkout session:', {
       sessionId: session.id,
       customerId: customer.id,
-      userEmail: userEmail
+      userEmail,
+      planDetails: {
+        name: planName,
+        price: planPrice,
+        letterCount: getLetterCountForPlan(planName)
+      }
     });
     
     res.json({ id: session.id });

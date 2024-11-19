@@ -72,6 +72,7 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
     console.log('Selected Premium Plan');
   } else {
     console.log('Warning: Unrecognized payment amount:', amount);
+    throw new Error(`Unrecognized payment amount: ${amount}`);
   }
 
   const subscriptionEndDate = new Date();
@@ -90,9 +91,17 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
   const currentUser = await users.findOne({ email: customerEmail });
   console.log('Current user data:', currentUser);
 
-  // Update the user plan in the database
-  const updateResult = await users.updateOne(
-    { email: customerEmail },
+  if (!currentUser) {
+    throw new Error(`No user found with email: ${customerEmail}`);
+  }
+
+  // Use findOneAndUpdate to ensure atomic update
+  const updateResult = await users.findOneAndUpdate(
+    { 
+      email: customerEmail,
+      // Add version check to prevent concurrent updates
+      _id: currentUser._id
+    },
     {
       $set: {
         selectedPlan,
@@ -102,30 +111,30 @@ const handlePaymentSuccess = async (db, paymentIntent, transporter) => {
         subscriptionEndDate,
         stripePaymentIntentId: paymentIntent.id
       }
+    },
+    {
+      returnDocument: 'after' // Return the updated document
     }
   );
 
-  console.log('Update result:', {
-    matchedCount: updateResult.matchedCount,
-    modifiedCount: updateResult.modifiedCount,
-    upsertedCount: updateResult.upsertedCount,
-    upsertedId: updateResult.upsertedId
-  });
+  console.log('Update result:', updateResult);
 
-  if (updateResult.matchedCount === 0) {
-    throw new Error(`No user found with email: ${customerEmail}`);
+  if (!updateResult.value) {
+    throw new Error(`Failed to update user plan for email: ${customerEmail}`);
   }
 
-  if (updateResult.modifiedCount === 0) {
-    throw new Error('Failed to update user plan');
-  }
-
-  // Fetch updated user data to confirm changes
-  const updatedUser = await users.findOne({ email: customerEmail });
+  const updatedUser = updateResult.value;
   console.log('Updated user data:', updatedUser);
 
+  // Verify the update was successful
+  if (updatedUser.selectedPlan !== selectedPlan || updatedUser.letterCount !== letterCount) {
+    throw new Error('Plan update verification failed. Database values do not match expected values.');
+  }
+
   // Send confirmation email
-  await sendConfirmationEmail(transporter, customerEmail, selectedPlan, letterCount, subscriptionEndDate);
+  if (transporter) {
+    await sendConfirmationEmail(transporter, customerEmail, selectedPlan, letterCount, subscriptionEndDate);
+  }
 
   return { customerEmail, selectedPlan, letterCount };
 };
@@ -143,7 +152,8 @@ const handleCheckoutSession = async (db, session, transporter) => {
     customer_details: session.customer_details,
     payment_intent: session.payment_intent,
     amount_total: session.amount_total,
-    currency: session.currency
+    currency: session.currency,
+    metadata: session.metadata
   });
 
   if (!session.payment_intent) {
@@ -154,7 +164,8 @@ const handleCheckoutSession = async (db, session, transporter) => {
   console.log('Retrieved payment intent:', {
     id: paymentIntent.id,
     amount: paymentIntent.amount,
-    status: paymentIntent.status
+    status: paymentIntent.status,
+    metadata: paymentIntent.metadata
   });
   
   // Add checkout session ID to payment intent metadata for tracking

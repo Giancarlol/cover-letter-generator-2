@@ -31,6 +31,13 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
         timestamp: new Date().toISOString()
       });
 
+      // Store the pending plan information
+      sessionStorage.setItem('pendingPlan', JSON.stringify({
+        name: planName,
+        price: planPrice,
+        timestamp: new Date().toISOString()
+      }));
+
       // Use the API endpoint directly since proxy is configured
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
@@ -86,11 +93,23 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({ planName, planPrice, on
       console.error('Stripe checkout error:', error);
       // Clear stored data on error
       sessionStorage.removeItem('checkoutSessionId');
+      sessionStorage.removeItem('pendingPlan');
       onError(error instanceof Error ? error.message : 'An error occurred during checkout');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Only clean up if there was an error (no successful redirect)
+      if (document.location.pathname !== '/success') {
+        sessionStorage.removeItem('checkoutSessionId');
+        sessionStorage.removeItem('pendingPlan');
+      }
+    };
+  }, []);
 
   if (!stripe) {
     return <div className="text-center p-4">Loading payment system...</div>;
