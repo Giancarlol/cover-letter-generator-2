@@ -124,71 +124,78 @@ function App() {
   return (
     <Elements stripe={stripePromise}>
       <div className="min-h-screen bg-gray-100">
-        <nav className="bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex">
-                <div className="flex-shrink-0 flex items-center">
-                  <Link to="/" className="text-xl font-bold text-gray-900">
-                    {t('navigation.coverLetterGenerator')}
+        <header role="banner">
+          <nav className="bg-white shadow-sm" role="navigation" aria-label="Main navigation">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between h-16">
+                <div className="flex">
+                  <div className="flex-shrink-0 flex items-center">
+                    <Link to="/" className="text-xl font-bold text-gray-900" aria-label="Home">
+                      <h1 className="text-xl font-bold">{t('navigation.coverLetterGenerator')}</h1>
+                    </Link>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  {/* Language Selector */}
+                  <select
+                    onChange={(e) => changeLanguage(e.target.value)}
+                    value={i18n.language}
+                    className="mr-4 px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    aria-label="Select language"
+                  >
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="sv">Svenska</option>
+                  </select>
+
+                  <Link
+                    to="/contact"
+                    className="mr-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                    aria-label="Contact us"
+                  >
+                    {t('navigation.contact')}
                   </Link>
+
+                  <Link
+                    to="/faqs"
+                    className="mr-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                    aria-label="Frequently asked questions"
+                  >
+                    {t('navigation.faqs')}
+                  </Link>
+                  {isAuthenticated && (
+                    <>
+                      <div className="mr-4 text-sm text-gray-600" role="status">
+                        <div>{t('navigation.currentPlan')}: {userData?.selectedPlan || t('plans.freePlan')}</div>
+                        {userData?.subscriptionEndDate && (
+                          <div className="text-xs text-gray-500">
+                            {t('navigation.expires')}: {new Date(userData.subscriptionEndDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setShowPaymentPlan(true)}
+                        className="mr-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                        aria-label="View payment plans"
+                      >
+                        {t('navigation.plans')}
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                        aria-label="Log out"
+                      >
+                        {t('navigation.logout')}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center">
-                {/* Language Selector */}
-                <select
-                  onChange={(e) => changeLanguage(e.target.value)}
-                  value={i18n.language}
-                  className="mr-4 px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="en">English</option>
-                  <option value="es">Español</option>
-                  <option value="sv">Svenska</option>
-                </select>
-
-                <Link
-                  to="/contact"
-                  className="mr-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-                >
-                  {t('navigation.contact')}
-                </Link>
-
-                <Link
-                  to="/faqs"
-                  className="mr-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-                >
-                  {t('navigation.faqs')}
-                </Link>
-                {isAuthenticated && (
-                  <>
-                    <div className="mr-4 text-sm text-gray-600">
-                      <div>{t('navigation.currentPlan')}: {userData?.selectedPlan || t('plans.freePlan')}</div>
-                      {userData?.subscriptionEndDate && (
-                        <div className="text-xs text-gray-500">
-                          {t('navigation.expires')}: {new Date(userData.subscriptionEndDate).toLocaleDateString()}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setShowPaymentPlan(true)}
-                      className="mr-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      {t('navigation.plans')}
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
-                    >
-                      {t('navigation.logout')}
-                    </button>
-                  </>
-                )}
-              </div>
             </div>
-          </div>
-        </nav>
+          </nav>
+        </header>
 
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8" role="main">
           {showPaymentPlan && userData && (
             <PaymentPlanSelection
               onSelectPlan={handleSelectPlan}
@@ -250,6 +257,25 @@ function App() {
             <Route path="/contact" element={<ContactForm />} />
           </Routes>
         </main>
+
+        <footer className="bg-white shadow-sm mt-8" role="contentinfo">
+          <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+            <nav aria-label="Footer navigation">
+              <ul className="flex justify-center space-x-6">
+                <li>
+                  <Link to="/contact" className="text-sm text-gray-500 hover:text-gray-900">
+                    {t('navigation.contact')}
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/faqs" className="text-sm text-gray-500 hover:text-gray-900">
+                    {t('navigation.faqs')}
+                  </Link>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        </footer>
       </div>
     </Elements>
   );

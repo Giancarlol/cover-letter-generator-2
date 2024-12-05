@@ -210,37 +210,25 @@ export const resetPassword = async (token: string, newPassword: string): Promise
 // Refresh user data after updating the plan status
 export const refreshUserData = async (): Promise<PersonalData | null> => {
   try {
-    console.log('Starting refreshUserData');
     const currentUser = await checkAuth();
-    console.log('Current user from checkAuth:', currentUser);
     
     if (!currentUser) {
-      console.log('No current user found');
       return null;
     }
 
     const headers = getAuthHeaders();
 
     // Update the user's plan status on the server
-    console.log('Making update-plan-status request');
     const response = await fetch(`${API_BASE_URL}/update-plan-status`, {
       method: 'POST',
       headers: mergeHeaders(headers),
       body: JSON.stringify({ email: currentUser.email }),
     });
-    
-    console.log('Update plan status response:', {
-      status: response.status,
-      statusText: response.statusText,
-      url: response.url
-    });
 
     await handleResponse(response);
-    console.log('Plan status updated successfully');
 
     // Get the fresh user data after plan update
     const updatedUser = await getUser(currentUser.email);
-    console.log('Got updated user data:', updatedUser);
     return updatedUser;
   } catch (error) {
     console.error('Error in refreshUserData:', error);

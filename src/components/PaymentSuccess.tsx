@@ -11,7 +11,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
-  const MAX_ATTEMPTS = 5; // Increased from 3 to 5 attempts
+  const MAX_ATTEMPTS = 5;
   const RETRY_DELAY = 2000; // 2 seconds
 
   useEffect(() => {
@@ -21,8 +21,6 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
         const pendingPlanStr = sessionStorage.getItem('pendingPlan');
         const sessionId = sessionStorage.getItem('checkoutSessionId');
         const pendingPlan = pendingPlanStr ? JSON.parse(pendingPlanStr) : null;
-
-        console.log(`Attempt ${attempts + 1} of ${MAX_ATTEMPTS} to verify payment...`);
         
         // Get current user data
         const userData = await refreshUserData();
@@ -41,8 +39,6 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
 
         // If plan is updated, clean up and redirect
         if (planUpdated) {
-          console.log('Payment verification successful');
-
           // Clean up stored data
           sessionStorage.removeItem('pendingPlan');
           sessionStorage.removeItem('checkoutSessionId');
@@ -54,8 +50,6 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
 
         // If we've made all attempts and plan isn't updated, show a warning
         if (attempts >= MAX_ATTEMPTS - 1) {
-          console.log('Payment verification timeout');
-          
           setError(`Your payment is being processed. If your plan is not updated within 24 hours, please contact support with reference: ${sessionId}`);
           
           // Clean up stored data
@@ -68,7 +62,6 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ onUpdateUser }) => {
         }
 
         // If plan is still not updated and we have more attempts, retry
-        console.log('Payment verification pending, retrying...');
         setAttempts(prev => prev + 1);
         
       } catch (error) {

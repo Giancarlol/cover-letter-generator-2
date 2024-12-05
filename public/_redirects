@@ -1,2 +1,8 @@
+# Redirect www to non-www
+https://www.cover-letter-generator.com/* https://cover-letter-generator.com/:splat 301!
+
+# API redirects
 /api/*  https://tailored-letters-app-49dff41a7b95.herokuapp.com/api/:splat  200
+
+# SPA fallback
 /*    /index.html   200
