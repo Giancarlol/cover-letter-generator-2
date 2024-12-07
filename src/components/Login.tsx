@@ -52,24 +52,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </p>
       </div>
 
-      {/* Features Section */}
-      <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3 text-gray-900">Quick & Easy</h2>
-          <p className="text-gray-600">Generate tailored cover letters in minutes using our AI-powered platform.</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3 text-gray-900">Professional Quality</h2>
-          <p className="text-gray-600">Get expertly crafted cover letters that highlight your unique skills and experience.</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3 text-gray-900">Job-Specific</h2>
-          <p className="text-gray-600">Customize your letter based on the job description for better targeting.</p>
-        </div>
-      </div>
-
       {/* Login Form */}
-      <div className="max-w-md w-full mx-auto bg-white p-8 rounded-lg shadow-md">
+      <div className="max-w-md w-full mx-auto bg-white p-8 rounded-lg shadow-md mb-12">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Sign in to get started</h2>
         </div>
@@ -146,6 +130,22 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           >
             Don't have an account? Register now
           </Link>
+        </div>
+      </div>
+
+      {/* Features Section */}
+      <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-3 text-gray-900">Quick & Easy</h2>
+          <p className="text-gray-600">Generate tailored cover letters in minutes using our AI-powered platform.</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-3 text-gray-900">Professional Quality</h2>
+          <p className="text-gray-600">Get expertly crafted cover letters that highlight your unique skills and experience.</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-3 text-gray-900">Job-Specific</h2>
+          <p className="text-gray-600">Customize your letter based on the job description for better targeting.</p>
         </div>
       </div>
     </div>
