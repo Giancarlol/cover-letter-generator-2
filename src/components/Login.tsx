@@ -135,17 +135,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       {/* Features Section */}
       <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3 text-gray-900">Quick & Easy</h2>
-          <p className="text-gray-600">Generate tailored cover letters in minutes using our AI-powered platform.</p>
+        <div className="bg-white p-8 rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">Quick & Easy</h2>
+          <p className="text-gray-600 text-center">Generate tailored cover letters in minutes using our AI-powered platform.</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3 text-gray-900">Professional Quality</h2>
-          <p className="text-gray-600">Get expertly crafted cover letters that highlight your unique skills and experience.</p>
+        <div className="bg-white p-8 rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">Professional Quality</h2>
+          <p className="text-gray-600 text-center">Get expertly crafted cover letters that highlight your unique skills and experience.</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3 text-gray-900">Job-Specific</h2>
-          <p className="text-gray-600">Customize your letter based on the job description for better targeting.</p>
+        <div className="bg-white p-8 rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">Job-Specific</h2>
+          <p className="text-gray-600 text-center">Customize your letter based on the job description for better targeting.</p>
         </div>
       </div>
     </div>
